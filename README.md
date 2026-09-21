@@ -207,7 +207,8 @@ You may now reboot into OpenWrt.
 ### Changes within OpenWrt
 
 Once you have booted into OpenWrt and have internet connectivity, you will need to
-install the following packages using `opkg`:
+install the following packages using the package manager available on your
+installation (`apk` is preferred when both are available):
 
  * `blkid`
  * `block-mount`
@@ -250,4 +251,4 @@ Essentially, it flashes a new OpenWrt installation and copies/downloads your cha
 Behind the scenes, it involves:
  * Re-implementing OpenWrt's overlay filesystem initialization code using shell scripts.
  * Creating an extremely lightweight Linux container using `unshare`, `nsenter`, and `dumb-init`.
- * Using the container to run `opkg` within the newly-flashed installation.
+ * Using the container to run the installed package manager within the newly-flashed installation.

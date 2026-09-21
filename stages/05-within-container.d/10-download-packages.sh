@@ -28,24 +28,46 @@ echo "Copying desired package list..."
 grep -v '^#' "$UPGRADE_PACKAGES_FILE" \
     >"$MOUNTED_WORKDIR/$packageslist_filename"
 
-# Run 'opkg update' within the container.
+# Select the package manager in the target installation.
+package_manager="$(abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c \
+    'command -v apk >/dev/null 2>&1 && printf apk || command -v opkg >/dev/null 2>&1 && printf opkg')"
+if [ -z "$package_manager" ]; then
+    echo "error: neither apk nor opkg is installed in the target installation." 1>&2
+    exit 127
+fi
+if [ "$package_manager" = apk ]; then
+    package_install_command="add --no-network"
+else
+    package_install_command="install"
+fi
+
+# Refresh package indexes within the container.
 echo "Fetching available package information..."
 TMPDIR= abpp_container_enter "$MOUNTED_ROOT" \
-    opkg update
+    "$package_manager" update
 
-# Download the packages within the container.
+# Download the packages within the container. `apk fetch` writes package archives,
+# while opkg's download-only install uses the current directory.
 echo "Downloading packages..."
-TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c "\
-    cd '$MOUNTED_WORKDIR_REL/$packages_dirname';      \
-    cat '$MOUNTED_WORKDIR_REL/$packageslist_filename' \
-        | xargs opkg install --download-only
-"
+if [ "$package_manager" = apk ]; then
+    TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c "\
+        cd '$MOUNTED_WORKDIR_REL/$packages_dirname'; \
+        apk fetch --recursive \
+            \$(grep -v '^#' '$MOUNTED_WORKDIR_REL/$packageslist_filename')
+    "
+else
+    TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c "\
+        cd '$MOUNTED_WORKDIR_REL/$packages_dirname';      \
+        cat '$MOUNTED_WORKDIR_REL/$packageslist_filename' \
+            | xargs opkg install --download-only
+    "
+fi
 
 # Add an entry to uci-defaults to install the packages on boot.
 echo "Preparing uci-default to install packages..."
 touch "$MOUNTED_ROOT/etc/uci-defaults/99_abpp_reboot"
 cat <<EOF >"$MOUNTED_ROOT/etc/uci-defaults/01_abpp_01_install_packages"
-opkg install "$MOUNTED_WORKDIR_REL/$packages_dirname"/* \
+$package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/* \
     && rm -rf "$MOUNTED_WORKDIR_REL/$packages_dirname" \
     && rm "$MOUNTED_WORKDIR_REL/$packageslist_filename" \
     && echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot

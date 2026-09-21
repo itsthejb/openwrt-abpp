@@ -17,6 +17,7 @@
 # ---------------------------------------------------------------------------------------------------------------------
 set -euo pipefail
 SCRIPTS="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+source "$SCRIPTS/lib/packages.sh"
 
 VERSION="${1:-}"
 OUTDIR="${2:-}"
@@ -54,7 +55,14 @@ then
 fi
 
 # Verify the signature of the checksums.
-KEYS_DIR="/etc/opkg/keys"
+case "$(abpp_packages_manager)" in
+apk)
+    KEYS_DIR="/etc/apk/keys"
+    ;;
+opkg)
+    KEYS_DIR="/etc/opkg/keys"
+    ;;
+esac
 
 echo "Verifying checksum signatures..." 1>&2
 if [ "${REALLY_BAD_IDEA:-}" != "iknow" ]; then
