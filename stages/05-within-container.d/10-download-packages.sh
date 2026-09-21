@@ -36,9 +36,11 @@ if [ -z "$package_manager" ]; then
     exit 127
 fi
 if [ "$package_manager" = apk ]; then
-    package_install_command="add --no-network"
+    package_install_command="add --no-network --repositories-file /dev/null --force-non-repository"
+    package_archive_pattern="*.apk"
 else
     package_install_command="install"
+    package_archive_pattern="*.ipk"
 fi
 
 # Refresh package indexes within the container.
@@ -51,9 +53,13 @@ TMPDIR= abpp_container_enter "$MOUNTED_ROOT" \
 echo "Downloading packages..."
 if [ "$package_manager" = apk ]; then
     TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c "\
+        set -e; \
         cd '$MOUNTED_WORKDIR_REL/$packages_dirname'; \
         apk fetch --recursive \
-            \$(grep -v '^#' '$MOUNTED_WORKDIR_REL/$packageslist_filename')
+            --output '$MOUNTED_WORKDIR_REL/$packages_dirname' \
+            \$(grep -v '^#' '$MOUNTED_WORKDIR_REL/$packageslist_filename'); \
+        set -- *.apk; \
+        [ -f \"\$1\" ] || { echo 'error: apk fetch did not produce any package archives.' 1>&2; exit 1; }
     "
 else
     TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c "\
@@ -67,8 +73,11 @@ fi
 echo "Preparing uci-default to install packages..."
 touch "$MOUNTED_ROOT/etc/uci-defaults/99_abpp_reboot"
 cat <<EOF >"$MOUNTED_ROOT/etc/uci-defaults/01_abpp_01_install_packages"
-$package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/* \
-    && rm -rf "$MOUNTED_WORKDIR_REL/$packages_dirname" \
-    && rm "$MOUNTED_WORKDIR_REL/$packageslist_filename" \
-    && echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot
+if ! $package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern; then
+    echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2
+    exit 1
+fi
+rm -rf "$MOUNTED_WORKDIR_REL/$packages_dirname"
+rm "$MOUNTED_WORKDIR_REL/$packageslist_filename"
+echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot
 EOF
