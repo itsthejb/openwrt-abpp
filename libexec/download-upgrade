@@ -79,7 +79,13 @@ if [ "${REALLY_BAD_IDEA:-}" != "iknow" ]; then
             echo "Install it with: apk add gnupg2" 1>&2
             exit 127
         fi
-        if ! gpg --verify "$temp/sha256sums.asc" "$temp/sha256sums"; then
+        gpg_home="$temp/gnupg"
+        mkdir -m 700 "$gpg_home"
+        if ! GNUPGHOME="$gpg_home" gpg --batch --quiet \
+            --import "$SCRIPTS/keys/openwrt-25.12-release.asc" ||
+            ! GNUPGHOME="$gpg_home" gpg --batch --quiet \
+                --verify "$temp/sha256sums.asc" "$temp/sha256sums"
+        then
             echo "Checksum signature check failed!" 1>&2
             echo "signature check failed"
             exit 3
