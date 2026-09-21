@@ -17,6 +17,7 @@
 # ---------------------------------------------------------------------------------------------------------------------
 set -euo pipefail
 SCRIPTS="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+source "$SCRIPTS/lib/packages.sh"
 
 VERSION="${1:-}"
 OUTDIR="${2:-}"
@@ -53,11 +54,18 @@ then
     exit 2
 fi
 
-# Verify the signature of the checksums. These are OpenWrt firmware-release
-# signatures and are independent of the installed package manager.
-KEYS_DIR="/etc/opkg/keys"
+# Verify the signature of the checksums using the selected package manager's
+# key directory.
+case "$(abpp_packages_manager)" in
+apk)
+    KEYS_DIR="/etc/apk/keys"
+    ;;
+opkg)
+    KEYS_DIR="/etc/opkg/keys"
+    ;;
+esac
 if ! [ -d "$KEYS_DIR" ]; then
-    echo "error: OpenWrt firmware signing keys are missing from $KEYS_DIR." 1>&2
+    echo "error: package signing keys are missing from $KEYS_DIR." 1>&2
     exit 127
 fi
 
