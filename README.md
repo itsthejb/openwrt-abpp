@@ -220,6 +220,7 @@ installation (`apk` is preferred when both are available):
  * `parted`
  * `squashfs-tools-unsquashfs`
  * `unshare`
+ * `gnupg` (required when downloading releases from an APK-based installation)
 
 After installing the packages, configure partition 2
 [to be mounted on startup](https://openwrt.org/docs/guide-user/storage/fstab).

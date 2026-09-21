@@ -14,6 +14,7 @@
 # Depends on packages:
 #  * wget (built-in)
 #  * usign (built-in)
+#  * gnupg (required for APK-based releases)
 # ---------------------------------------------------------------------------------------------------------------------
 set -euo pipefail
 SCRIPTS="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
@@ -37,6 +38,7 @@ DOWNLOAD_ROOT_URL="${DOWNLOAD_URL_BASE}/openwrt-${VERSION}-${ARCH}-generic-squas
 DOWNLOAD_KERNEL_URL="${DOWNLOAD_URL_BASE}/openwrt-${VERSION}-${ARCH}-generic-kernel.bin"
 DOWNLOAD_CHECKSUM_URL="${DOWNLOAD_URL_BASE}/sha256sums"
 DOWNLOAD_CHECKSUM_SIG_URL="${DOWNLOAD_URL_BASE}/sha256sums.sig"
+DOWNLOAD_CHECKSUM_ASC_URL="${DOWNLOAD_URL_BASE}/sha256sums.asc"
 DOWNLOAD_URL_BASE="https://downloads.openwrt.org/releases/${VERSION}/targets/${BOARD}/"
 
 # Create a download folder.
@@ -45,39 +47,53 @@ trap 'rm -rf "$temp"' EXIT
 
 # Download the checksums.
 echo "Downloading checksums..." 1>&2
-if ! wget -q -P "$temp" \
-    "$DOWNLOAD_CHECKSUM_URL" \
-    "$DOWNLOAD_CHECKSUM_SIG_URL"
-then
+if ! wget -q -P "$temp" "$DOWNLOAD_CHECKSUM_URL"; then
     echo "Failed to download checksums." 1>&2
     echo "download failed"
     exit 2
 fi
 
-# Verify the signature of the checksums using the selected package manager's
-# key directory.
+# Verify the release checksum using the signature format supported by the
+# installed package-manager generation.
 case "$(abpp_packages_manager)" in
 apk)
-    KEYS_DIR="/etc/apk/keys"
+    signature_type="gpg"
+    signature_url="$DOWNLOAD_CHECKSUM_ASC_URL"
     ;;
 opkg)
-    KEYS_DIR="/etc/opkg/keys"
+    signature_type="usign"
+    signature_url="$DOWNLOAD_CHECKSUM_SIG_URL"
     ;;
 esac
-if ! [ -d "$KEYS_DIR" ]; then
-    echo "error: package signing keys are missing from $KEYS_DIR." 1>&2
-    exit 127
+if ! wget -q -P "$temp" "$signature_url"; then
+    echo "Failed to download checksum signature." 1>&2
+    echo "download failed"
+    exit 2
 fi
 
 echo "Verifying checksum signatures..." 1>&2
 if [ "${REALLY_BAD_IDEA:-}" != "iknow" ]; then
-    if ! usign -q -V -m "$temp/sha256sums" -P "$KEYS_DIR"; then
-        echo "Checksum signature check failed!" 1>&2
-        echo "" 1>&2
-        echo "If you REALLY think you want to proceed, set the" 1>&2
-        echo "REALLY_BAD_IDEA='iknow' environment variable and try again." 1>&2
-        echo "signature check failed"
-        exit 3
+    if [ "$signature_type" = gpg ]; then
+        if ! command -v gpg >/dev/null 2>&1; then
+            echo "error: gpg is required to verify APK-based OpenWrt releases." 1>&2
+            exit 127
+        fi
+        if ! gpg --verify "$temp/sha256sums.asc" "$temp/sha256sums"; then
+            echo "Checksum signature check failed!" 1>&2
+            echo "signature check failed"
+            exit 3
+        fi
+    else
+        KEYS_DIR="/etc/opkg/keys"
+        if ! [ -d "$KEYS_DIR" ]; then
+            echo "error: opkg signing keys are missing from $KEYS_DIR." 1>&2
+            exit 127
+        fi
+        if ! usign -q -V -m "$temp/sha256sums" -P "$KEYS_DIR"; then
+            echo "Checksum signature check failed!" 1>&2
+            echo "signature check failed"
+            exit 3
+        fi
     fi
 fi
 
