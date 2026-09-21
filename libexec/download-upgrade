@@ -76,6 +76,7 @@ if [ "${REALLY_BAD_IDEA:-}" != "iknow" ]; then
     if [ "$signature_type" = gpg ]; then
         if ! command -v gpg >/dev/null 2>&1; then
             echo "error: gpg is required to verify APK-based OpenWrt releases." 1>&2
+            echo "Install it with: apk add gnupg2" 1>&2
             exit 127
         fi
         if ! gpg --verify "$temp/sha256sums.asc" "$temp/sha256sums"; then
