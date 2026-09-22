@@ -8,18 +8,40 @@
 # Library script for fetching information about installed packages.
 # ---------------------------------------------------------------------------------------------------------------------
 # Depends on packages:
-#  * opkg (built-in)
+#  * apk or opkg (built-in)
 # ---------------------------------------------------------------------------------------------------------------------
 
+# Function: abpp_packages_manager
+# Prints the installed package manager, preferring `apk` when both are available.
+abpp_packages_manager() {
+    if command -v apk >/dev/null 2>&1; then
+        printf '%s\n' apk
+    elif command -v opkg >/dev/null 2>&1; then
+        printf '%s\n' opkg
+    else
+        echo "error: neither apk nor opkg is installed" 1>&2
+        return 127
+    fi
+}
+
 # Function: __abpp_packages_list_installed
-# Lists all the packages that can be found under `opkg`'s info directory.
+# Lists all the packages installed in the given root.
 #
 # Parameters:
-#   $1 -- The directory to scan.
+#   $1 -- The root directory to query.
 __abpp_packages_list_installed() {
-    printf "%s\n" "$1"/*.list \
-        | grep -o '/[^/]\{1,\}$' \
-        | sed 's#^/##; s#\.list$##'
+    local root="$1"
+    case "$(abpp_packages_manager)" in
+        apk)
+            awk 'substr($0, 1, 2) == "P:" { print substr($0, 3) }' \
+                "$root/lib/apk/db/installed"
+            ;;
+        opkg)
+            printf "%s\n" "$root/usr/lib/opkg/info"/*.list \
+                | grep -o '/[^/]\{1,\}$' \
+                | sed 's#^/##; s#\.list$##'
+            ;;
+    esac
 }
 
 # Function: __abpp_packages_remove_nonunique
@@ -44,13 +66,23 @@ __abpp_packages_remove_nonunique() {
 # Parameters:
 #   &0 -- The packages to query.
 abpp_packages_resolve_dependencies() {
+    local manager
+    manager="$(abpp_packages_manager)"
+
     while read -r package; do
-        grep '^Depends: ' "/usr/lib/opkg/info/$package.control" || true
+        if [ "$manager" = apk ]; then
+            awk -v package="$package" '
+                substr($0, 1, 2) == "P:" { found = (substr($0, 3) == package) }
+                found && substr($0, 1, 2) == "D:" { print substr($0, 3); exit }
+            ' /lib/apk/db/installed
+        else
+            grep '^Depends: ' "/usr/lib/opkg/info/$package.control" || true
+        fi
     done \
         | sed 's/^Depends: //' \
         | sed 's/([^)]\{1,\})//' \
         | sed 's/, /,/g' \
-        | tr ',' '\n' \
+        | tr ' ,' '\n' \
         | sort -u
 }
 
@@ -60,26 +92,36 @@ abpp_packages_resolve_dependencies() {
 # Parameters:
 #   &0 -- The packages to query.
 abpp_packages_resolve_provides() {
+    local manager
+    manager="$(abpp_packages_manager)"
+
     while read -r package; do
-        grep '^Provides: ' "/usr/lib/opkg/info/$package.control" || true
+        if [ "$manager" = apk ]; then
+            awk -v package="$package" '
+                substr($0, 1, 2) == "P:" { found = (substr($0, 3) == package) }
+                found && substr($0, 1, 2) == "p:" { print substr($0, 3); exit }
+            ' /lib/apk/db/installed
+        else
+            grep '^Provides: ' "/usr/lib/opkg/info/$package.control" || true
+        fi
     done \
         | sed 's/^Provides: //' \
         | sed 's/([^)]\{1,\})//' \
         | sed 's/, /,/g' \
-        | tr ',' '\n' \
+        | tr ' ,' '\n' \
         | sort -u
 }
 
 # Function: abpp_packages_list_all_installed
 # Prints a list of all the installed packages.
 abpp_packages_list_all_installed() {
-    __abpp_packages_list_installed /usr/lib/opkg/info
+    __abpp_packages_list_installed /
 }
 
 # Function: abpp_packages_list_baseimage_installed
 # Prints a list of all packages that came installed with the rootfs.
 abpp_packages_list_baseimage_installed() {
-    __abpp_packages_list_installed /rom/usr/lib/opkg/info
+    __abpp_packages_list_installed /rom
 }
 
 # Function: abpp_packages_list_user_installed

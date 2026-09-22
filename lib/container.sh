@@ -116,6 +116,17 @@ abpp_container_create() {
         return 0
     fi
 
+    # Remove namespace mountpoints left by an interrupted container startup.
+    # A namespace file may still be a mountpoint even after its host process
+    # has exited, which prevents the files from being recreated below.
+    if [ -d "$rundir/ns" ]; then
+        local ns
+        for ns in mnt pid ipc cgroup; do
+            umount "$rundir/ns/$ns" 2>/dev/null || true
+            rm -f "$rundir/ns/$ns"
+        done
+    fi
+
     # Create the directory structure.
     mkdir -p "$rundir" "$rundir/ns" "$rundir/sessions"
     touch "$rundir/host.pid" \
@@ -125,8 +136,10 @@ abpp_container_create() {
         "$rundir/ns/cgroup"
 
     # Create a target for pivot_root.
+    local created_parent=false
     if ! [ -d "$mount/.parent" ]; then
         mkdir -p "$mount/.parent"
+        created_parent=true
     fi
 
     # Create the namespaces and use dumb-init as the init process.
@@ -144,15 +157,34 @@ abpp_container_create() {
         /usr/sbin/dumb-init /bin/ash -c \
         "mount -t proc procfs '$mount/proc' \
             && pivot_root '$mount' '$mount/.parent' \
-            && while true; do sleep 1; done" &
+            && while true; do sleep 1; done" >/dev/null 2>&1 &
 
     echo "$!" > "$rundir/host.pid"
 
     # Wait until it's possible to enter the container.
+    local elapsed=0
     while true; do
         sleep 1
+        elapsed=$((elapsed + 1))
         if __abpp_container_enter "$mount" /bin/true; then
+            echo "Container ready after ${elapsed}s."
             break
+        fi
+        if ! kill -0 "$(cat "$rundir/host.pid")" 2>/dev/null; then
+            echo "error: container process exited while starting." 1>&2
+            for ns in mnt pid ipc cgroup; do
+                umount "$rundir/ns/$ns" 2>/dev/null || true
+                rm -f "$rundir/ns/$ns"
+            done
+            rm -f "$rundir/host.pid"
+            rmdir "$rundir/ns" "$rundir/sessions" "$rundir" 2>/dev/null || true
+            if [ "$created_parent" = true ]; then
+                rmdir "$mount/.parent" 2>/dev/null || true
+            fi
+            return 1
+        fi
+        if [ $((elapsed % 5)) -eq 0 ]; then
+            echo "Still waiting for container to become ready (${elapsed}s)..."
         fi
     done
 }
@@ -260,9 +292,9 @@ abpp_container_enter() {
 
     # Enter the container's namespaces.
     local status=0
-    if ! __abpp_container_enter "$@"; then
+    __abpp_container_enter "$@" || {
         status=$?
-    fi
+    }
 
     # Remove this process from the session list.
     rm "$rundir/sessions/$$"

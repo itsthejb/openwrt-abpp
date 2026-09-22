@@ -11,6 +11,7 @@
 
 packages_dirname="/packages"
 packageslist_filename="packages.list"
+packages_log_filename="packages-install.log"
 
 # Ensure /var/lock exists within the new installation.
 if ! [ -d "$MOUNTED_ROOT/var/lock" ]; then
@@ -28,25 +29,89 @@ echo "Copying desired package list..."
 grep -v '^#' "$UPGRADE_PACKAGES_FILE" \
     >"$MOUNTED_WORKDIR/$packageslist_filename"
 
-# Run 'opkg update' within the container.
-echo "Fetching available package information..."
-TMPDIR= abpp_container_enter "$MOUNTED_ROOT" \
-    opkg update
+# Select the package manager in the target installation.
+package_manager="$(abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c '
+    if command -v apk >/dev/null 2>&1; then
+        printf apk
+    elif command -v opkg >/dev/null 2>&1; then
+        printf opkg
+    fi
+')"
+if [ -z "$package_manager" ]; then
+    echo "error: neither apk nor opkg is installed in the target installation." 1>&2
+    exit 127
+fi
+echo "Target package manager: $package_manager"
+if [ "$package_manager" = apk ]; then
+    package_install_command="add --no-network --repositories-file /dev/null --force-non-repository"
+    package_archive_pattern="*.apk"
+else
+    package_install_command="install"
+    package_archive_pattern="*.ipk"
+fi
 
-# Download the packages within the container.
-echo "Downloading packages..."
-TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c "\
-    cd '$MOUNTED_WORKDIR_REL/$packages_dirname';      \
-    cat '$MOUNTED_WORKDIR_REL/$packageslist_filename' \
-        | xargs opkg install --download-only
-"
+# Refresh package indexes within the container.
+echo "Fetching available package information with $package_manager..."
+if [ "$package_manager" = apk ]; then
+    TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c '
+        echo "Target time: $(date)"
+        if [ -s /etc/ssl/certs/ca-certificates.crt ]; then
+            echo "CA bundle: /etc/ssl/certs/ca-certificates.crt"
+        else
+            echo "WARNING: /etc/ssl/certs/ca-certificates.crt is missing or empty" 1>&2
+        fi
+        update_log="$(mktemp)"
+        apk update >"$update_log" 2>&1
+        status=$?
+        cat "$update_log"
+        if grep -Eq "wgetSSL error|unexpected end of file|unavailable" "$update_log"; then
+            echo "error: APK repository refresh failed; check the target clock and CA bundle." 1>&2
+            rm -f "$update_log"
+            exit 1
+        fi
+        rm -f "$update_log"
+        exit "$status"
+    '
+else
+    TMPDIR= abpp_container_enter "$MOUNTED_ROOT" \
+        "$package_manager" update
+fi
+echo "Package information fetched."
+
+# Download the packages within the container. `apk fetch` writes package archives,
+# while opkg's download-only install uses the current directory.
+echo "Downloading selected packages..."
+if [ "$package_manager" = apk ]; then
+    TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c "\
+        set -e; \
+        cd '$MOUNTED_WORKDIR_REL/$packages_dirname'; \
+        apk fetch --recursive \
+            --output '$MOUNTED_WORKDIR_REL/$packages_dirname' \
+            \$(grep -v '^#' '$MOUNTED_WORKDIR_REL/$packageslist_filename'); \
+        set -- *.apk; \
+        [ -f \"\$1\" ] || { echo 'error: apk fetch did not produce any package archives.' 1>&2; exit 1; }
+    "
+    echo "APK package archives downloaded."
+else
+    TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c "\
+        cd '$MOUNTED_WORKDIR_REL/$packages_dirname';      \
+        cat '$MOUNTED_WORKDIR_REL/$packageslist_filename' \
+            | xargs opkg install --download-only
+    "
+    echo "OPKG package archives downloaded."
+fi
 
 # Add an entry to uci-defaults to install the packages on boot.
 echo "Preparing uci-default to install packages..."
 touch "$MOUNTED_ROOT/etc/uci-defaults/99_abpp_reboot"
 cat <<EOF >"$MOUNTED_ROOT/etc/uci-defaults/01_abpp_01_install_packages"
-opkg install "$MOUNTED_WORKDIR_REL/$packages_dirname"/* \
-    && rm -rf "$MOUNTED_WORKDIR_REL/$packages_dirname" \
-    && rm "$MOUNTED_WORKDIR_REL/$packageslist_filename" \
-    && echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot
+exec >"$MOUNTED_WORKDIR_REL/$packages_log_filename" 2>&1
+set -x
+
+if ! $package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern; then
+    echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2
+    exit 1
+fi
+echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot
 EOF
+echo "First-boot package installation script created."
