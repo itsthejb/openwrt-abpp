@@ -30,8 +30,13 @@ grep -v '^#' "$UPGRADE_PACKAGES_FILE" \
     >"$MOUNTED_WORKDIR/$packageslist_filename"
 
 # Select the package manager in the target installation.
-package_manager="$(abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c \
-    'command -v apk >/dev/null 2>&1 && printf apk || command -v opkg >/dev/null 2>&1 && printf opkg')"
+package_manager="$(abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c '
+    if command -v apk >/dev/null 2>&1; then
+        printf apk
+    elif command -v opkg >/dev/null 2>&1; then
+        printf opkg
+    fi
+')"
 if [ -z "$package_manager" ]; then
     echo "error: neither apk nor opkg is installed in the target installation." 1>&2
     exit 127

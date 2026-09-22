@@ -260,9 +260,9 @@ abpp_container_enter() {
 
     # Enter the container's namespaces.
     local status=0
-    if ! __abpp_container_enter "$@"; then
+    __abpp_container_enter "$@" || {
         status=$?
-    fi
+    }
 
     # Remove this process from the session list.
     rm "$rundir/sessions/$$"
