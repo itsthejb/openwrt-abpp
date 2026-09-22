@@ -149,10 +149,20 @@ abpp_container_create() {
     echo "$!" > "$rundir/host.pid"
 
     # Wait until it's possible to enter the container.
+    local elapsed=0
     while true; do
         sleep 1
+        elapsed=$((elapsed + 1))
         if __abpp_container_enter "$mount" /bin/true; then
+            echo "Container ready after ${elapsed}s."
             break
+        fi
+        if ! kill -0 "$(cat "$rundir/host.pid")" 2>/dev/null; then
+            echo "error: container process exited while starting." 1>&2
+            return 1
+        fi
+        if [ $((elapsed % 5)) -eq 0 ]; then
+            echo "Still waiting for container to become ready (${elapsed}s)..."
         fi
     done
 }
