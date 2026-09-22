@@ -41,6 +41,7 @@ if [ -z "$package_manager" ]; then
     echo "error: neither apk nor opkg is installed in the target installation." 1>&2
     exit 127
 fi
+echo "Target package manager: $package_manager"
 if [ "$package_manager" = apk ]; then
     package_install_command="add --no-network --repositories-file /dev/null --force-non-repository"
     package_archive_pattern="*.apk"
@@ -50,13 +51,14 @@ else
 fi
 
 # Refresh package indexes within the container.
-echo "Fetching available package information..."
+echo "Fetching available package information with $package_manager..."
 TMPDIR= abpp_container_enter "$MOUNTED_ROOT" \
     "$package_manager" update
+echo "Package information fetched."
 
 # Download the packages within the container. `apk fetch` writes package archives,
 # while opkg's download-only install uses the current directory.
-echo "Downloading packages..."
+echo "Downloading selected packages..."
 if [ "$package_manager" = apk ]; then
     TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c "\
         set -e; \
@@ -67,12 +69,14 @@ if [ "$package_manager" = apk ]; then
         set -- *.apk; \
         [ -f \"\$1\" ] || { echo 'error: apk fetch did not produce any package archives.' 1>&2; exit 1; }
     "
+    echo "APK package archives downloaded."
 else
     TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c "\
         cd '$MOUNTED_WORKDIR_REL/$packages_dirname';      \
         cat '$MOUNTED_WORKDIR_REL/$packageslist_filename' \
             | xargs opkg install --download-only
     "
+    echo "OPKG package archives downloaded."
 fi
 
 # Add an entry to uci-defaults to install the packages on boot.
@@ -88,3 +92,4 @@ if ! $package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_d
 fi
 echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot
 EOF
+echo "First-boot package installation script created."
