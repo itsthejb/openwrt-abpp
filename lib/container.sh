@@ -159,6 +159,13 @@ abpp_container_create() {
         fi
         if ! kill -0 "$(cat "$rundir/host.pid")" 2>/dev/null; then
             echo "error: container process exited while starting." 1>&2
+            for ns in mnt pid ipc cgroup; do
+                umount "$rundir/ns/$ns" 2>/dev/null || true
+                rm -f "$rundir/ns/$ns"
+            done
+            rm -f "$rundir/host.pid"
+            rmdir "$rundir/ns" "$rundir/sessions" "$rundir" 2>/dev/null || true
+            rmdir "$mount/.parent" 2>/dev/null || true
             return 1
         fi
         if [ $((elapsed % 5)) -eq 0 ]; then
