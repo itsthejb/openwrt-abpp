@@ -157,7 +157,7 @@ abpp_container_create() {
         /usr/sbin/dumb-init /bin/ash -c \
         "mount -t proc procfs '$mount/proc' \
             && pivot_root '$mount' '$mount/.parent' \
-            && while true; do sleep 1; done" &
+            && while true; do sleep 1; done" >/dev/null 2>&1 &
 
     echo "$!" > "$rundir/host.pid"
 

@@ -146,6 +146,7 @@ run_stage() {
         else
             "$stage_file"
         fi
+        echo "Stage complete: $stage_rel"
     } 2>&1 | tee -a "$ABPP_WORKDIR/abupgrade.log" || {
         echo ""
         abpp_print_error \
