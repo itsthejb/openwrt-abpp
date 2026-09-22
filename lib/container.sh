@@ -116,6 +116,17 @@ abpp_container_create() {
         return 0
     fi
 
+    # Remove namespace mountpoints left by an interrupted container startup.
+    # A namespace file may still be a mountpoint even after its host process
+    # has exited, which prevents the files from being recreated below.
+    if [ -d "$rundir/ns" ]; then
+        local ns
+        for ns in mnt pid ipc cgroup; do
+            umount "$rundir/ns/$ns" 2>/dev/null || true
+            rm -f "$rundir/ns/$ns"
+        done
+    fi
+
     # Create the directory structure.
     mkdir -p "$rundir" "$rundir/ns" "$rundir/sessions"
     touch "$rundir/host.pid" \
