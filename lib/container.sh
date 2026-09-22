@@ -125,8 +125,10 @@ abpp_container_create() {
         "$rundir/ns/cgroup"
 
     # Create a target for pivot_root.
+    local created_parent=false
     if ! [ -d "$mount/.parent" ]; then
         mkdir -p "$mount/.parent"
+        created_parent=true
     fi
 
     # Create the namespaces and use dumb-init as the init process.
@@ -165,7 +167,9 @@ abpp_container_create() {
             done
             rm -f "$rundir/host.pid"
             rmdir "$rundir/ns" "$rundir/sessions" "$rundir" 2>/dev/null || true
-            rmdir "$mount/.parent" 2>/dev/null || true
+            if [ "$created_parent" = true ]; then
+                rmdir "$mount/.parent" 2>/dev/null || true
+            fi
             return 1
         fi
         if [ $((elapsed % 5)) -eq 0 ]; then
