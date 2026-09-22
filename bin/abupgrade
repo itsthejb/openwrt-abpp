@@ -44,9 +44,8 @@ export TMPDIR="$ABPP_TEMPDIR"
 # Preserve the complete upgrade transcript for diagnosing failures before the
 # target root or package-install log exists.
 [ -d "$ABPP_WORKDIR" ] || mkdir -p "$ABPP_WORKDIR"
-exec >"$ABPP_WORKDIR/abupgrade.log" 2>&1
-echo "abupgrade started: $(date)"
-echo "script root: $SCRIPTS"
+printf 'abupgrade started: %s\nscript root: %s\n' "$(date)" "$SCRIPTS" \
+    >>"$ABPP_WORKDIR/abupgrade.log"
 
 # Utility function to update variables inside the varsfile.
 abpp_update_var() {
@@ -147,7 +146,7 @@ run_stage() {
         else
             "$stage_file"
         fi
-    } || {
+    } 2>&1 | tee -a "$ABPP_WORKDIR/abupgrade.log" || {
         echo ""
         abpp_print_error \
             "Upgrade step failed." \
@@ -172,4 +171,4 @@ done
 # ==> All stages have been run. Clean up remaining files.
 if [ -f "$ABPP_WORKDIR/STAGE" ]; then rm "$ABPP_WORKDIR/STAGE"; fi
 if [ -f "$ABPP_WORKDIR/VARS" ];  then rm "$ABPP_WORKDIR/VARS"; fi
-echo "Upgrade completed: $(date)"
+printf 'Upgrade completed: %s\n' "$(date)" | tee -a "$ABPP_WORKDIR/abupgrade.log"
