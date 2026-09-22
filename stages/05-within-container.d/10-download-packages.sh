@@ -52,8 +52,30 @@ fi
 
 # Refresh package indexes within the container.
 echo "Fetching available package information with $package_manager..."
-TMPDIR= abpp_container_enter "$MOUNTED_ROOT" \
-    "$package_manager" update
+if [ "$package_manager" = apk ]; then
+    TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c '
+        echo "Target time: $(date)"
+        if [ -s /etc/ssl/certs/ca-certificates.crt ]; then
+            echo "CA bundle: /etc/ssl/certs/ca-certificates.crt"
+        else
+            echo "WARNING: /etc/ssl/certs/ca-certificates.crt is missing or empty" 1>&2
+        fi
+        update_log="$(mktemp)"
+        apk update >"$update_log" 2>&1
+        status=$?
+        cat "$update_log"
+        if grep -Eq "wgetSSL error|unexpected end of file|unavailable" "$update_log"; then
+            echo "error: APK repository refresh failed; check the target clock and CA bundle." 1>&2
+            rm -f "$update_log"
+            exit 1
+        fi
+        rm -f "$update_log"
+        exit "$status"
+    '
+else
+    TMPDIR= abpp_container_enter "$MOUNTED_ROOT" \
+        "$package_manager" update
+fi
 echo "Package information fetched."
 
 # Download the packages within the container. `apk fetch` writes package archives,
