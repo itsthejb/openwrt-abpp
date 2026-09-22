@@ -11,6 +11,7 @@
 
 packages_dirname="/packages"
 packageslist_filename="packages.list"
+packages_log_filename="packages-install.log"
 
 # Ensure /var/lock exists within the new installation.
 if ! [ -d "$MOUNTED_ROOT/var/lock" ]; then
@@ -73,11 +74,12 @@ fi
 echo "Preparing uci-default to install packages..."
 touch "$MOUNTED_ROOT/etc/uci-defaults/99_abpp_reboot"
 cat <<EOF >"$MOUNTED_ROOT/etc/uci-defaults/01_abpp_01_install_packages"
+exec >"$MOUNTED_WORKDIR_REL/$packages_log_filename" 2>&1
+set -x
+
 if ! $package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern; then
     echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2
     exit 1
 fi
-rm -rf "$MOUNTED_WORKDIR_REL/$packages_dirname"
-rm "$MOUNTED_WORKDIR_REL/$packageslist_filename"
 echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot
 EOF
