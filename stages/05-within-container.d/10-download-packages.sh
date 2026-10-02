@@ -117,8 +117,6 @@ set -o pipefail
         echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2
         exit 1
     fi
-    echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot
-    echo "Package installation complete; reboot scheduled."
 } 2>&1 | awk '
     /^(Installing|Upgrading) / {
         package = $0
@@ -130,5 +128,21 @@ set -o pipefail
     }
     { print; fflush() }
 ' | tee "$MOUNTED_WORKDIR_REL/$packages_log_filename" >/dev/console
+
+if [ "$?" -ne 0 ]; then
+    exit 1
+fi
+
+if ! echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot; then
+    printf '%s\n' "error: could not schedule the final reboot." \
+        | tee -a "$MOUNTED_WORKDIR_REL/$packages_log_filename" >>/dev/console
+    exit 1
+fi
+printf '%s\n' "Package installation complete; reboot scheduled." \
+    | tee -a "$MOUNTED_WORKDIR_REL/$packages_log_filename" >>/dev/console
+if ! rm -rf "$MOUNTED_WORKDIR_REL"; then
+    echo "error: could not remove $MOUNTED_WORKDIR_REL after package installation." >/dev/console
+    exit 1
+fi
 EOF
 echo "First-boot package installation script created."

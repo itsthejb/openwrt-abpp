@@ -247,8 +247,9 @@ script. It will:
 
 Once you reboot into the newly-flashed partition, openwrt-abpp will restore your configuration, install your packages,
 and trigger a reboot to finalize everything. First-boot package installation progress is displayed on the boot console,
-including a numbered message for each package as the package manager installs it. The complete output is also saved to
-`/abpp-upgrading/packages-install.log`.
+including a numbered message for each package as the package manager installs it. Output is saved to
+`/abpp-upgrading/packages-install.log` while installation runs. After a successful installation, `/abpp-upgrading` is
+removed before reboot; if installation fails, the directory and log are kept for troubleshooting.
 
 ### Excluding packages from migration
 
