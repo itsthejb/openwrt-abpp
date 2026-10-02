@@ -158,6 +158,7 @@ abpp_container_create() {
         /usr/sbin/dumb-init /bin/ash -c \
         "set -x \
             && mount --make-rprivate / \
+            && mount --bind '$mount' '$mount' \
             && mount -t proc procfs '$mount/proc' \
             && cd '$mount' \
             && pivot_root . .parent \
