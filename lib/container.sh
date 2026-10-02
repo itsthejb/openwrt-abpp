@@ -141,6 +141,7 @@ abpp_container_create() {
         mkdir -p "$mount/.parent"
         created_parent=true
     fi
+    mkdir -p "$mount/proc"
 
     # Create the namespaces and use dumb-init as the init process.
     #  * Create namespaces.
