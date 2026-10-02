@@ -41,12 +41,6 @@ export ABPP_VARSFILE="$ABPP_WORKDIR/VARS"
 export ABPP_TEMPDIR="$ABPP_WORKDIR/temp"
 export TMPDIR="$ABPP_TEMPDIR"
 
-# Preserve the complete upgrade transcript for diagnosing failures before the
-# target root or package-install log exists.
-[ -d "$ABPP_WORKDIR" ] || mkdir -p "$ABPP_WORKDIR"
-printf 'abupgrade started: %s\nscript root: %s\n' "$(date)" "$SCRIPTS" \
-    >>"$ABPP_WORKDIR/abupgrade.log"
-
 # Utility function to update variables inside the varsfile.
 abpp_update_var() {
     {
@@ -138,22 +132,27 @@ run_stage() {
     eval "$(sed 's/^/export /' "$ABPP_VARSFILE")"
 
     # Run the script.
-    {
-        echo ""
-        abpp_print_stage "$(stage_name "$stage_rel")"
-        if [ "$(head -n1 "$stage_file")" = "#=abpp" ]; then
-            ({ source "$stage_file"; }) || return $?
+    echo ""
+    abpp_print_stage "$(stage_name "$stage_rel")"
+    if [ "$(head -n1 "$stage_file")" = "#=abpp" ]; then
+        if ({ source "$stage_file"; }); then
+            :
         else
-            "$stage_file" || return $?
+            stage_status=$?
+            abpp_print_error \
+                "Upgrade step failed." \
+                "See above for details."
+            return "$stage_status"
         fi
-        echo "Stage complete: $stage_rel"
-    } 2>&1 | tee -a "$ABPP_WORKDIR/abupgrade.log" || {
-        echo ""
+    elif "$stage_file"; then
+        :
+    else
+        stage_status=$?
         abpp_print_error \
             "Upgrade step failed." \
             "See above for details."
-        return 1
-    }
+        return "$stage_status"
+    fi
 }
 
 while [ -n "$next_stage" ]; do
@@ -172,4 +171,4 @@ done
 # ==> All stages have been run. Clean up remaining files.
 if [ -f "$ABPP_WORKDIR/STAGE" ]; then rm "$ABPP_WORKDIR/STAGE"; fi
 if [ -f "$ABPP_WORKDIR/VARS" ];  then rm "$ABPP_WORKDIR/VARS"; fi
-printf 'Upgrade completed: %s\n' "$(date)" | tee -a "$ABPP_WORKDIR/abupgrade.log"
+if [ -d "$ABPP_WORKDIR" ];       then rmdir "$ABPP_WORKDIR"; fi

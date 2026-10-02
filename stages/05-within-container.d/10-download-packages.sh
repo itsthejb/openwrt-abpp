@@ -57,12 +57,6 @@ fi
 echo "Fetching available package information with $package_manager..."
 if [ "$package_manager" = apk ]; then
     if ! TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c '
-        echo "Target time: $(date)"
-        if [ -s /etc/ssl/certs/ca-certificates.crt ]; then
-            echo "CA bundle: /etc/ssl/certs/ca-certificates.crt"
-        else
-            echo "WARNING: /etc/ssl/certs/ca-certificates.crt is missing or empty" 1>&2
-        fi
         update_log="$(mktemp)"
         apk update >"$update_log" 2>&1
         status=$?
@@ -115,7 +109,6 @@ echo "Preparing uci-default to install packages..."
 touch "$MOUNTED_ROOT/etc/uci-defaults/99_abpp_reboot"
 cat <<EOF >"$MOUNTED_ROOT/etc/uci-defaults/01_abpp_01_install_packages"
 exec >"$MOUNTED_WORKDIR_REL/$packages_log_filename" 2>&1
-set -x
 
 if ! $package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern; then
     echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2

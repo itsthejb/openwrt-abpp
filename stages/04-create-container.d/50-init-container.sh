@@ -17,4 +17,3 @@ abpp_container_firstrun
 # Create the container.
 echo "Creating container..."
 abpp_container_create "$MOUNTED_ROOT"
-echo "Container initialization complete."

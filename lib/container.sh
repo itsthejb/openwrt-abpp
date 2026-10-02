@@ -170,7 +170,7 @@ abpp_container_create() {
         --ipc="$rundir/ns/ipc" \
         --cgroup="$rundir/ns/cgroup" \
         /usr/sbin/dumb-init /bin/ash -c \
-        "set -ex
+        "set -e
             sleep 2147483 &
             keeper=\$!
             trap 'kill \"\$keeper\" 2>/dev/null || true' EXIT
@@ -182,7 +182,6 @@ abpp_container_create() {
             cd '$mount'
             pivot_root . .parent
             cd /
-            set +x
             wait \"\$keeper\"" >"$startup_log" 2>&1 &
 
     echo "$!" > "$rundir/host.pid"
