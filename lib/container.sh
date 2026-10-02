@@ -156,8 +156,12 @@ abpp_container_create() {
         --ipc="$rundir/ns/ipc" \
         --cgroup="$rundir/ns/cgroup" \
         /usr/sbin/dumb-init /bin/ash -c \
-        "mount -t proc procfs '$mount/proc' \
-            && pivot_root '$mount' '$mount/.parent' \
+        "set -x \
+            && mount --make-rprivate / \
+            && mount -t proc procfs '$mount/proc' \
+            && cd '$mount' \
+            && pivot_root . .parent \
+            && cd / \
             && while true; do sleep 1; done" >"$startup_log" 2>&1 &
 
     echo "$!" > "$rundir/host.pid"
