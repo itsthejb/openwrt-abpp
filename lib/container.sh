@@ -169,7 +169,7 @@ abpp_container_create() {
             sleep 2147483 &
             keeper=\$!
             trap 'kill \"\$keeper\" 2>/dev/null || true' EXIT
-            trap 'kill \"\$keeper\" 2>/dev/null || true; exit 0' TERM INT
+            trap 'exit 0' TERM INT
             mount --make-rprivate /
             mount --bind '$mount' '$mount'
             mount --bind /dev '$mount/dev'
