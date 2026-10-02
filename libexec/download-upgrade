@@ -101,9 +101,12 @@ if [ "${REALLY_BAD_IDEA:-}" != "iknow" ]; then
 
         # The keyserver is only a transport; trust only the pinned fingerprint.
         fingerprints="$(
-            GNUPGHOME="$gpg_home" gpg --batch --with-colons --fingerprint \
-                | cut -d: -f10 \
-                | tr 'a-f' 'A-F'
+            GNUPGHOME="$gpg_home" gpg --batch --with-colons --list-keys \
+                | awk -F: '$1 == "pub" { primary = 1; next }
+                           primary && $1 == "fpr" {
+                               print toupper($10)
+                               exit
+                           }'
         )"
         if ! printf '%s\n' "$fingerprints" | grep -F -x -q "$OPENWRT_GPG_KEY_FINGERPRINT"; then
             echo "error: downloaded OpenWrt signing key has an unexpected fingerprint." 1>&2
