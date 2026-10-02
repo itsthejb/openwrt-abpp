@@ -264,6 +264,9 @@ abpp_container_destroy() {
     # Remove host PID file.
     if [ -f "$rundir/host.pid" ]; then rm "$rundir/host.pid"; fi
 
+    # The startup log is only needed when initialization fails.
+    rm -f "${mount%/*}/container-startup.log"
+
     # Remove directories.
     local dir
     for dir in ns sessions; do
