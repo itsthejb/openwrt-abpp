@@ -173,7 +173,7 @@ abpp_container_create() {
     while true; do
         sleep 1
         elapsed=$((elapsed + 1))
-        if __abpp_container_enter "$mount" /bin/true; then
+        if __abpp_container_enter "$mount" /bin/busybox true; then
             echo "Container ready after ${elapsed}s."
             break
         fi
@@ -223,7 +223,7 @@ abpp_container_destroy() {
     # Wait until it's no longer possible to enter the container.
     while true; do
         sleep 1
-        if ! __abpp_container_enter "$mount" /bin/true 2>/dev/null; then
+        if ! __abpp_container_enter "$mount" /bin/busybox true 2>/dev/null; then
             break
         fi
     done
