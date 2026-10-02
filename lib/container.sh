@@ -163,7 +163,8 @@ abpp_container_create() {
             && cd '$mount' \
             && pivot_root . .parent \
             && cd / \
-            && while true; do sleep 1; done" >"$startup_log" 2>&1 &
+            && set +x \
+            && while true; do /bin/busybox sleep 3600; done" >"$startup_log" 2>&1 &
 
     echo "$!" > "$rundir/host.pid"
 
