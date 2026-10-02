@@ -61,7 +61,9 @@ abpp_container_alive() {
     kill -0 "$(cat "$rundir/host.pid")" &>/dev/null || return 1
 
     # The container is probably alive. 
-    return 0
+    # A live unshare process is not enough: the target root may have been
+    # unmounted or removed while the process remained. Verify namespace entry.
+    __abpp_container_enter "$mount" /bin/ash -c : >/dev/null 2>&1
 }
 
 # Function: abpp_container_sessions
@@ -114,6 +116,18 @@ abpp_container_create() {
     # Do nothing if the container is already alive.
     if abpp_container_alive "$mount"; then
         return 0
+    fi
+
+    # Do not replace namespace files while an old unshare process still owns
+    # them. The caller must destroy this unusable container first.
+    if [ -f "$rundir/host.pid" ]; then
+        local host_pid
+        host_pid="$(cat "$rundir/host.pid")"
+        if kill -0 "$host_pid" 2>/dev/null; then
+            echo "error: container process $host_pid is running but its namespace is unusable." 1>&2
+            echo "Destroy the stale container before creating it again." 1>&2
+            return 1
+        fi
     fi
 
     # Remove namespace mountpoints left by an interrupted container startup.
