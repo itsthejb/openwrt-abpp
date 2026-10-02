@@ -246,7 +246,8 @@ script. It will:
  * Update GRUB to automatically select the newly-flashed partition.
 
 Once you reboot into the newly-flashed partition, openwrt-abpp will restore your configuration, install your packages,
-and trigger a reboot to finalize everything.
+and trigger a reboot to finalize everything. First-boot package installation progress is displayed on the boot console;
+the complete output is also saved to `/abpp-upgrading/packages-install.log`.
 
 ### Excluding packages from migration
 

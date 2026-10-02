@@ -109,12 +109,16 @@ fi
 echo "Preparing uci-default to install packages..."
 touch "$MOUNTED_ROOT/etc/uci-defaults/99_abpp_reboot"
 cat <<EOF >"$MOUNTED_ROOT/etc/uci-defaults/01_abpp_01_install_packages"
-exec >"$MOUNTED_WORKDIR_REL/$packages_log_filename" 2>&1
+set -o pipefail
 
-if ! $package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern; then
-    echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2
-    exit 1
-fi
-echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot
+{
+    echo "Installing staged packages..."
+    if ! $package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern; then
+        echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2
+        exit 1
+    fi
+    echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot
+    echo "Package installation complete; reboot scheduled."
+} 2>&1 | tee "$MOUNTED_WORKDIR_REL/$packages_log_filename" >/dev/console
 EOF
 echo "First-boot package installation script created."
