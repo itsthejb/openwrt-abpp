@@ -43,7 +43,10 @@ if [ -z "$package_manager" ]; then
 fi
 echo "Target package manager: $package_manager"
 if [ "$package_manager" = apk ]; then
-    package_install_command="add --no-network --repositories-file /dev/null --force-non-repository"
+    # OpenWrt buildbot packages are not individually signed by default; apk
+    # authenticated their checksums through the trusted repository index when
+    # fetching them. Permit those verified local archives during offline install.
+    package_install_command="add --allow-untrusted --no-network --repositories-file /dev/null --force-non-repository"
     package_archive_pattern="*.apk"
 else
     package_install_command="install"
