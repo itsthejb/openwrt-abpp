@@ -248,6 +248,23 @@ script. It will:
 Once you reboot into the newly-flashed partition, openwrt-abpp will restore your configuration, install your packages,
 and trigger a reboot to finalize everything.
 
+### Excluding packages from migration
+
+Packages unavailable from the target release's repositories can be omitted from
+the migration and installed separately after the upgrade. Create or edit
+`/etc/config/abpp` with one `exclude_package` list entry per package:
+
+```uci
+config abpp 'main'
+        list exclude_package 'luci-app-argon-config'
+        list exclude_package 'luci-theme-argon'
+```
+
+Configured exclusions are removed from the proposed package list and remain
+excluded even if added in the package-list editor. With no configuration file
+or no exclusion entries, all selected packages are handled as usual. Excluded
+packages are not installed by openwrt-abpp after reboot.
+
 ## How it Works
 
 Essentially, it flashes a new OpenWrt installation and copies/downloads your changes to it.

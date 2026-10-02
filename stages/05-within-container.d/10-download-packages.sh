@@ -26,7 +26,8 @@ fi
 
 # Copy the packages list.
 echo "Copying desired package list..."
-grep -v '^#' "$UPGRADE_PACKAGES_FILE" \
+abpp_packages_filter_excluded \
+    <"$UPGRADE_PACKAGES_FILE" \
     >"$MOUNTED_WORKDIR/$packageslist_filename"
 
 # Select the package manager in the target installation.

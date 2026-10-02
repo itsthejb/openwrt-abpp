@@ -38,6 +38,80 @@ abpp_packages_manager() {
     fi
 }
 
+# Function: __abpp_packages_excluded_list
+# Prints the configured package exclusions, if any.
+#
+# Parameters:
+#   $1 -- Optional path to the UCI configuration file (defaults to /etc/config/abpp).
+__abpp_packages_excluded_list() {
+    local config_file="${1:-/etc/config/abpp}"
+    local config_dir="${config_file%/*}"
+    local config_name="${config_file##*/}"
+    local values
+
+    if ! [ -e "$config_file" ]; then
+        return 0
+    fi
+    if ! [ -f "$config_file" ] || ! [ -r "$config_file" ]; then
+        echo "error: ABPP package configuration is not a readable file: $config_file" 1>&2
+        return 1
+    fi
+    if ! command -v uci >/dev/null 2>&1; then
+        echo "error: uci is required to read $config_file" 1>&2
+        return 1
+    fi
+    if ! uci -q -c "$config_dir" export "$config_name" >/dev/null 2>&1; then
+        echo "error: could not read UCI configuration: $config_file" 1>&2
+        return 1
+    fi
+
+    if ! values="$(uci -q -c "$config_dir" get "$config_name.main.exclude_package" 2>/dev/null)"; then
+        return 0
+    fi
+
+    if ! printf '%s\n' "$values" | awk '
+        {
+            for (i = 1; i <= NF; i++) {
+                if ($i !~ /^[[:alnum:]_.+-]+$/) {
+                    printf "error: invalid package name in ABPP exclusions: %s\n", $i > "/dev/stderr"
+                    invalid = 1
+                } else {
+                    print $i
+                }
+            }
+        }
+        END { exit invalid }
+    '; then
+        return 1
+    fi
+}
+
+# Function: abpp_packages_filter_excluded
+# Removes configured exclusions and comments/blank lines from a package list.
+#
+# Parameters:
+#   &0 -- The package names to filter.
+#   $1 -- Optional path to the UCI configuration file (defaults to /etc/config/abpp).
+abpp_packages_filter_excluded() {
+    local excluded
+    local package
+    excluded="$(__abpp_packages_excluded_list "${1:-/etc/config/abpp}")" || return $?
+
+    while IFS= read -r package || [ -n "$package" ]; do
+        case "$package" in
+            ""|\#*) continue ;;
+        esac
+        case "
+$excluded
+" in
+            *"
+$package
+"*) continue ;;
+        esac
+        printf '%s\n' "$package"
+    done
+}
+
 # Function: __abpp_packages_list_installed
 # Lists all the packages installed in the given root.
 #
