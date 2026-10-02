@@ -94,19 +94,18 @@ if [ "${REALLY_BAD_IDEA:-}" != "iknow" ]; then
         fi
         gpg_home="$temp/gnupg"
         mkdir -m 700 "$gpg_home"
-        if ! GNUPGHOME="$gpg_home" gpg --batch --quiet --import "$key_file"; then
+        import_status="$temp/gpg-import.status"
+        if ! GNUPGHOME="$gpg_home" gpg --batch --status-fd 1 \
+            --import "$key_file" >"$import_status"
+        then
             echo "error: failed to import the downloaded OpenWrt signing key." 1>&2
             exit 3
         fi
 
         # The keyserver is only a transport; trust only the pinned fingerprint.
         fingerprints="$(
-            GNUPGHOME="$gpg_home" gpg --batch --with-colons --list-keys \
-                | awk -F: '$1 == "pub" { primary = 1; next }
-                           primary && $1 == "fpr" {
-                               print toupper($10)
-                               exit
-                           }'
+            awk '$1 == "[GNUPG:]" && $2 == "IMPORT_OK" { print toupper($4) }' \
+                "$import_status"
         )"
         if ! printf '%s\n' "$fingerprints" | grep -F -x -q "$OPENWRT_GPG_KEY_FINGERPRINT"; then
             echo "error: downloaded OpenWrt signing key has an unexpected fingerprint." 1>&2
