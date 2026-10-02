@@ -207,7 +207,8 @@ You may now reboot into OpenWrt.
 ### Changes within OpenWrt
 
 Once you have booted into OpenWrt and have internet connectivity, you will need to
-install the following packages using `opkg`:
+install the following packages using the package manager available on your
+installation (`apk` is preferred when both are available):
 
  * `blkid`
  * `block-mount`
@@ -222,6 +223,10 @@ install the following packages using `opkg`:
 
 After installing the packages, configure partition 2
 [to be mounted on startup](https://openwrt.org/docs/guide-user/storage/fstab).
+
+When downloading a release from an APK-based installation, `download-upgrade`
+installs `gnupg2` if needed and verifies the downloaded release key against
+OpenWrt's pinned signing-key fingerprint.
 
 Finally, download [a tarball of this repo](https://github.com/eth-p/openwrt-abpp/archive/refs/heads/master.tar.gz) and
 extract somewhere within partition 2.
@@ -243,6 +248,23 @@ script. It will:
 Once you reboot into the newly-flashed partition, openwrt-abpp will restore your configuration, install your packages,
 and trigger a reboot to finalize everything.
 
+### Excluding packages from migration
+
+Packages unavailable from the target release's repositories can be omitted from
+the migration and installed separately after the upgrade. Create or edit
+`/etc/config/abpp` with one `exclude_package` list entry per package:
+
+```uci
+config abpp 'main'
+        list exclude_package 'luci-app-argon-config'
+        list exclude_package 'luci-theme-argon'
+```
+
+Configured exclusions are removed from the proposed package list and remain
+excluded even if added in the package-list editor. With no configuration file
+or no exclusion entries, all selected packages are handled as usual. Excluded
+packages are not installed by openwrt-abpp after reboot.
+
 ## How it Works
 
 Essentially, it flashes a new OpenWrt installation and copies/downloads your changes to it.
@@ -250,4 +272,4 @@ Essentially, it flashes a new OpenWrt installation and copies/downloads your cha
 Behind the scenes, it involves:
  * Re-implementing OpenWrt's overlay filesystem initialization code using shell scripts.
  * Creating an extremely lightweight Linux container using `unshare`, `nsenter`, and `dumb-init`.
- * Using the container to run `opkg` within the newly-flashed installation.
+ * Using the container to run the installed package manager within the newly-flashed installation.
