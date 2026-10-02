@@ -156,15 +156,19 @@ abpp_container_create() {
         --ipc="$rundir/ns/ipc" \
         --cgroup="$rundir/ns/cgroup" \
         /usr/sbin/dumb-init /bin/ash -c \
-        "set -x \
-            && mount --make-rprivate / \
-            && mount --bind '$mount' '$mount' \
-            && mount -t proc procfs '$mount/proc' \
-            && cd '$mount' \
-            && pivot_root . .parent \
-            && cd / \
-            && set +x \
-            && while true; do /bin/busybox sleep 3600; done" >"$startup_log" 2>&1 &
+        "set -ex
+            (while :; do sleep 3600; done) &
+            keeper=\$!
+            trap 'kill \"\$keeper\" 2>/dev/null || true' EXIT
+            trap 'kill \"\$keeper\" 2>/dev/null || true; exit 0' TERM INT
+            mount --make-rprivate /
+            mount --bind '$mount' '$mount'
+            mount -t proc procfs '$mount/proc'
+            cd '$mount'
+            pivot_root . .parent
+            cd /
+            set +x
+            wait \"\$keeper\"" >"$startup_log" 2>&1 &
 
     echo "$!" > "$rundir/host.pid"
 
@@ -173,7 +177,7 @@ abpp_container_create() {
     while true; do
         sleep 1
         elapsed=$((elapsed + 1))
-        if __abpp_container_enter "$mount" /bin/busybox true; then
+        if __abpp_container_enter "$mount" /bin/ash -c :; then
             echo "Container ready after ${elapsed}s."
             break
         fi
@@ -216,14 +220,14 @@ abpp_container_destroy() {
 
     # Kill the init process if it's alive.
     if [ -f "$rundir/host.pid" ]; then
-        __abpp_container_enter "$mount" /bin/kill -TERM 1 || true
+        __abpp_container_enter "$mount" /bin/ash -c 'kill -TERM 1' || true
         kill -INT "$(cat "$rundir/host.pid")" || true
     fi
 
     # Wait until it's no longer possible to enter the container.
     while true; do
         sleep 1
-        if ! __abpp_container_enter "$mount" /bin/busybox true 2>/dev/null; then
+        if ! __abpp_container_enter "$mount" /bin/ash -c : 2>/dev/null; then
             break
         fi
     done
