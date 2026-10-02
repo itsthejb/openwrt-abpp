@@ -55,7 +55,6 @@ abpp_container_alive() {
 
     local mount="$1"
     local rundir="$(abpp_container_get_rundir "$mount")"
-
     # Return error if the container is not alive.
     [ -d "$rundir" ]          || return 1
     [ -f "$rundir/host.pid" ] || return 1
@@ -110,6 +109,7 @@ abpp_container_create() {
 
     local mount="$1"
     local rundir="$(abpp_container_get_rundir "$mount")"
+    local startup_log="${mount%/*}/container-startup.log"
 
     # Do nothing if the container is already alive.
     if abpp_container_alive "$mount"; then
@@ -157,7 +157,7 @@ abpp_container_create() {
         /usr/sbin/dumb-init /bin/ash -c \
         "mount -t proc procfs '$mount/proc' \
             && pivot_root '$mount' '$mount/.parent' \
-            && while true; do sleep 1; done" >/dev/null 2>&1 &
+            && while true; do sleep 1; done" >"$startup_log" 2>&1 &
 
     echo "$!" > "$rundir/host.pid"
 
@@ -172,6 +172,10 @@ abpp_container_create() {
         fi
         if ! kill -0 "$(cat "$rundir/host.pid")" 2>/dev/null; then
             echo "error: container process exited while starting." 1>&2
+            if [ -s "$startup_log" ]; then
+                echo "Container startup output ($startup_log):" 1>&2
+                cat "$startup_log" 1>&2
+            fi
             for ns in mnt pid ipc cgroup; do
                 umount "$rundir/ns/$ns" 2>/dev/null || true
                 rm -f "$rundir/ns/$ns"
