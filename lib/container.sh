@@ -155,7 +155,7 @@ abpp_container_create() {
         mkdir -p "$mount/.parent"
         created_parent=true
     fi
-    mkdir -p "$mount/proc"
+    mkdir -p "$mount/proc" "$mount/dev"
 
     # Create the namespaces and use dumb-init as the init process.
     #  * Create namespaces.
@@ -171,12 +171,13 @@ abpp_container_create() {
         --cgroup="$rundir/ns/cgroup" \
         /usr/sbin/dumb-init /bin/ash -c \
         "set -ex
-            (while :; do sleep 3600; done) &
+            sleep 2147483 &
             keeper=\$!
             trap 'kill \"\$keeper\" 2>/dev/null || true' EXIT
             trap 'kill \"\$keeper\" 2>/dev/null || true; exit 0' TERM INT
             mount --make-rprivate /
             mount --bind '$mount' '$mount'
+            mount --bind /dev '$mount/dev'
             mount -t proc procfs '$mount/proc'
             cd '$mount'
             pivot_root . .parent

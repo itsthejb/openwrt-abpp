@@ -53,7 +53,7 @@ fi
 # Refresh package indexes within the container.
 echo "Fetching available package information with $package_manager..."
 if [ "$package_manager" = apk ]; then
-    TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c '
+    if ! TMPDIR= abpp_container_enter "$MOUNTED_ROOT" /bin/ash -c '
         echo "Target time: $(date)"
         if [ -s /etc/ssl/certs/ca-certificates.crt ]; then
             echo "CA bundle: /etc/ssl/certs/ca-certificates.crt"
@@ -71,10 +71,16 @@ if [ "$package_manager" = apk ]; then
         fi
         rm -f "$update_log"
         exit "$status"
-    '
+    '; then
+        echo "error: could not refresh APK repositories; package archives were not downloaded." 1>&2
+        return 1
+    fi
 else
-    TMPDIR= abpp_container_enter "$MOUNTED_ROOT" \
-        "$package_manager" update
+    if ! TMPDIR= abpp_container_enter "$MOUNTED_ROOT" \
+        "$package_manager" update; then
+        echo "error: could not refresh opkg repositories; package archives were not downloaded." 1>&2
+        return 1
+    fi
 fi
 echo "Package information fetched."
 

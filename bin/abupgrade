@@ -142,9 +142,9 @@ run_stage() {
         echo ""
         abpp_print_stage "$(stage_name "$stage_rel")"
         if [ "$(head -n1 "$stage_file")" = "#=abpp" ]; then
-            ({ source "$stage_file"; })
+            ({ source "$stage_file"; }) || return $?
         else
-            "$stage_file"
+            "$stage_file" || return $?
         fi
         echo "Stage complete: $stage_rel"
     } 2>&1 | tee -a "$ABPP_WORKDIR/abupgrade.log" || {
