@@ -111,7 +111,6 @@ abpp_container_create() {
 
     local mount="$1"
     local rundir="$(abpp_container_get_rundir "$mount")"
-    local startup_log="${mount%/*}/container-startup.log"
 
     # Do nothing if the container is already alive.
     if abpp_container_alive "$mount"; then
@@ -157,12 +156,8 @@ abpp_container_create() {
     fi
     mkdir -p "$mount/proc" "$mount/dev"
 
-    # Create the namespaces and use dumb-init as the init process.
-    #  * Create namespaces.
-    #  * Mount procfs to /proc under the container root.
-    #  * Pivot mount namespace's root to the container root.
-    #  * Sleep forever.
-    #  * Record the PID of unshare, which will forward signals.
+    # Keep the namespace init alive with a host-root sleep process; the target
+    # root may not contain a sleep executable.
     unshare \
         --fork \
         --mount="$rundir/ns/mnt" \
@@ -182,25 +177,19 @@ abpp_container_create() {
             cd '$mount'
             pivot_root . .parent
             cd /
-            wait \"\$keeper\"" >"$startup_log" 2>&1 &
+            wait \"\$keeper\"" &
 
     echo "$!" > "$rundir/host.pid"
 
     # Wait until it's possible to enter the container.
-    local elapsed=0
     while true; do
         sleep 1
-        elapsed=$((elapsed + 1))
         if __abpp_container_enter "$mount" /bin/ash -c :; then
-            echo "Container ready after ${elapsed}s."
+            echo "Container ready."
             break
         fi
         if ! kill -0 "$(cat "$rundir/host.pid")" 2>/dev/null; then
             echo "error: container process exited while starting." 1>&2
-            if [ -s "$startup_log" ]; then
-                echo "Container startup output ($startup_log):" 1>&2
-                cat "$startup_log" 1>&2
-            fi
             for ns in mnt pid ipc cgroup; do
                 umount "$rundir/ns/$ns" 2>/dev/null || true
                 rm -f "$rundir/ns/$ns"
@@ -211,9 +200,6 @@ abpp_container_create() {
                 rmdir "$mount/.parent" 2>/dev/null || true
             fi
             return 1
-        fi
-        if [ $((elapsed % 5)) -eq 0 ]; then
-            echo "Still waiting for container to become ready (${elapsed}s)..."
         fi
     done
 }
@@ -263,9 +249,6 @@ abpp_container_destroy() {
 
     # Remove host PID file.
     if [ -f "$rundir/host.pid" ]; then rm "$rundir/host.pid"; fi
-
-    # The startup log is only needed when initialization fails.
-    rm -f "${mount%/*}/container-startup.log"
 
     # Remove directories.
     local dir

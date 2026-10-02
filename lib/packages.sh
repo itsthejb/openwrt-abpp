@@ -12,8 +12,22 @@
 # ---------------------------------------------------------------------------------------------------------------------
 
 # Function: abpp_packages_manager
-# Prints the installed package manager, preferring `apk` when both are available.
+# Prints the package manager for the given root, preferring `apk` when both are
+# installed.
 abpp_packages_manager() {
+    local root="${1:-}"
+    if [ -n "$root" ]; then
+        if [ -f "$root/lib/apk/db/installed" ]; then
+            printf '%s\n' apk
+            return 0
+        elif [ -d "$root/usr/lib/opkg/info" ]; then
+            printf '%s\n' opkg
+            return 0
+        fi
+        echo "error: no supported package database found in $root" 1>&2
+        return 127
+    fi
+
     if command -v apk >/dev/null 2>&1; then
         printf '%s\n' apk
     elif command -v opkg >/dev/null 2>&1; then
@@ -31,7 +45,7 @@ abpp_packages_manager() {
 #   $1 -- The root directory to query.
 __abpp_packages_list_installed() {
     local root="$1"
-    case "$(abpp_packages_manager)" in
+    case "$(abpp_packages_manager "$root")" in
         apk)
             awk 'substr($0, 1, 2) == "P:" { print substr($0, 3) }' \
                 "$root/lib/apk/db/installed"

@@ -220,10 +220,13 @@ installation (`apk` is preferred when both are available):
  * `parted`
  * `squashfs-tools-unsquashfs`
  * `unshare`
- * `gnupg` (required when downloading releases from an APK-based installation)
 
 After installing the packages, configure partition 2
 [to be mounted on startup](https://openwrt.org/docs/guide-user/storage/fstab).
+
+When downloading a release from an APK-based installation, `download-upgrade`
+installs `gnupg2` if needed and verifies the downloaded release key against
+OpenWrt's pinned signing-key fingerprint.
 
 Finally, download [a tarball of this repo](https://github.com/eth-p/openwrt-abpp/archive/refs/heads/master.tar.gz) and
 extract somewhere within partition 2.
