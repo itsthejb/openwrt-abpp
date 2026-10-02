@@ -112,13 +112,23 @@ cat <<EOF >"$MOUNTED_ROOT/etc/uci-defaults/01_abpp_01_install_packages"
 set -o pipefail
 
 {
-    echo "Installing staged packages..."
+    echo "Starting staged package installation..."
     if ! $package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern; then
         echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2
         exit 1
     fi
     echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot
     echo "Package installation complete; reboot scheduled."
-} 2>&1 | tee "$MOUNTED_WORKDIR_REL/$packages_log_filename" >/dev/console
+} 2>&1 | awk '
+    /^(Installing|Upgrading) / {
+        package = $0
+        sub(/^(Installing|Upgrading) /, "", package)
+        sub(/[[:space:]].*$/, "", package)
+        count++
+        printf "Package %d: installing %s\n", count, package
+        fflush()
+    }
+    { print; fflush() }
+' | tee "$MOUNTED_WORKDIR_REL/$packages_log_filename" >/dev/console
 EOF
 echo "First-boot package installation script created."
