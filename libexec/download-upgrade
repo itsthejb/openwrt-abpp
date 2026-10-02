@@ -94,20 +94,26 @@ if [ "${REALLY_BAD_IDEA:-}" != "iknow" ]; then
         fi
         gpg_home="$temp/gnupg"
         mkdir -m 700 "$gpg_home"
+        if ! GNUPGHOME="$gpg_home" gpg --batch --quiet --import "$key_file"; then
+            echo "error: failed to import the downloaded OpenWrt signing key." 1>&2
+            exit 3
+        fi
+
         # The keyserver is only a transport; trust only the pinned fingerprint.
-        if ! GNUPGHOME="$gpg_home" gpg --batch --with-colons --show-keys \
-            --fingerprint "$key_file" \
-            | awk -F: -v expected="$OPENWRT_GPG_KEY_FINGERPRINT" \
-                '$1 == "fpr" && toupper($10) == expected { found = 1 }
-                 END { exit !found }'
-        then
+        fingerprints="$(
+            GNUPGHOME="$gpg_home" gpg --batch --with-colons --fingerprint \
+                | cut -d: -f10 \
+                | tr 'a-f' 'A-F'
+        )"
+        if ! printf '%s\n' "$fingerprints" | grep -F -x -q "$OPENWRT_GPG_KEY_FINGERPRINT"; then
             echo "error: downloaded OpenWrt signing key has an unexpected fingerprint." 1>&2
+            if [ -n "$fingerprints" ]; then
+                echo "Fingerprints found: $(printf '%s\n' "$fingerprints" | tr '\n' ' ')" 1>&2
+            fi
             exit 3
         fi
         if ! GNUPGHOME="$gpg_home" gpg --batch --quiet \
-            --import "$key_file" ||
-            ! GNUPGHOME="$gpg_home" gpg --batch --quiet \
-                --verify "$temp/sha256sums.asc" "$temp/sha256sums"
+            --verify "$temp/sha256sums.asc" "$temp/sha256sums"
         then
             echo "Checksum signature check failed!" 1>&2
             echo "signature check failed"
