@@ -218,8 +218,11 @@ installation (`apk` is preferred when both are available):
  * `losetup`
  * `nsenter`
  * `parted`
+ * `rsync`
  * `squashfs-tools-unsquashfs`
  * `unshare`
+
+`rsync` is used when `config_migration` is set to `rsync` in `/etc/config/abpp`.
 
 After installing the packages, configure partition 2
 [to be mounted on startup](https://openwrt.org/docs/guide-user/storage/fstab).
@@ -241,12 +244,28 @@ script. It will:
  * Let you select a version to flash.
  * Download the rootfs.
  * Flash the rootfs to the alternate partition.
- * Copy your configuration (using `sysupgrade -b`) to the alternate partition.
+ * Migrate your configuration using `sysupgrade` or `rsync`, depending on your configuration.
  * Download your currently-installed packages to the alternate partition.
  * Update GRUB to automatically select the newly-flashed partition.
 
-Once you reboot into the newly-flashed partition, openwrt-abpp will restore your configuration, install your packages,
-and trigger a reboot to finalize everything.
+Once you reboot into the newly-flashed partition, openwrt-abpp will finish restoring your configuration when using
+`sysupgrade`, install your packages, and trigger a reboot to finalize everything.
+
+### Choosing a configuration migration method
+
+By default, openwrt-abpp uses `sysupgrade` to back up the current configuration and restore it on the new partition's
+first boot. To use `rsync` instead, set `config_migration` in `/etc/config/abpp`:
+
+```uci
+config abpp 'main'
+        option config_migration 'rsync'
+```
+
+The supported values are `sysupgrade` and `rsync`. If `/etc/config/abpp` or the option is absent, `sysupgrade` is
+used. The `rsync` method copies the contents of `/etc`, including dot-files and hidden directories, to the new
+partition before reboot. It overwrites matching entries but does not delete target-only files, preserving defaults
+and first-boot scripts from the new OpenWrt release. Install the `rsync` package on the active system before selecting
+this method.
 
 ### Excluding packages from migration
 
