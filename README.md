@@ -248,8 +248,12 @@ script. It will:
  * Download your currently-installed packages to the alternate partition.
  * Update GRUB to automatically select the newly-flashed partition.
 
-Once you reboot into the newly-flashed partition, openwrt-abpp will finish restoring your configuration when using
-`sysupgrade`, install your packages, and trigger a reboot to finalize everything.
+Once you reboot into the newly-flashed partition, openwrt-abpp will restore your configuration, install your packages,
+and trigger a reboot to finalize everything. First-boot package installation progress is written to the kernel message
+log via `/dev/kmsg` and displayed on the boot console, including a numbered `current/total` message for each package as
+the package manager installs it. The total is the number of staged package archives. Output is saved to
+`/abpp-upgrading/packages-install.log` while installation runs. After a successful installation, `/abpp-upgrading` is
+removed before reboot; if installation fails, the directory and log are kept for troubleshooting.
 
 ### Choosing a configuration migration method
 

@@ -109,12 +109,54 @@ fi
 echo "Preparing uci-default to install packages..."
 touch "$MOUNTED_ROOT/etc/uci-defaults/99_abpp_reboot"
 cat <<EOF >"$MOUNTED_ROOT/etc/uci-defaults/01_abpp_01_install_packages"
-exec >"$MOUNTED_WORKDIR_REL/$packages_log_filename" 2>&1
+set -o pipefail
+set -- "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern
+package_total=\$#
+if [ "\$package_total" -eq 1 ] && ! [ -f "\$1" ]; then
+    package_total=0
+fi
 
-if ! $package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern; then
-    echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2
+{
+    echo "Starting staged package installation..."
+    printf '<6>ABPP: Starting staged package installation.\n' >>/dev/kmsg
+    if ! $package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern; then
+        echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2
+        exit 1
+    fi
+} 2>&1 | awk -v total="\$package_total" '
+    {
+        package = \$0
+        sub(/^[[:space:]]*/, "", package)
+        sub(/^\([0-9]+\/[0-9]+\)[[:space:]]*/, "", package)
+    }
+    /(^|[[:space:]])(Installing|Upgrading)[[:space:]]/ {
+        sub(/^.*(Installing|Upgrading)[[:space:]]+/, "", package)
+        sub(/[[:space:]].*$/, "", package)
+        count++
+        progress = sprintf("Package %d/%d: installing %s", count, total, package)
+        printf "<6>ABPP: %s\n", progress >> "/dev/kmsg"
+        close("/dev/kmsg")
+        print progress
+        fflush()
+    }
+    { print; fflush() }
+' | tee "$MOUNTED_WORKDIR_REL/$packages_log_filename" >/dev/console
+
+if [ "$?" -ne 0 ]; then
     exit 1
 fi
-echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot
+
+if ! echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot; then
+    printf '%s\n' "error: could not schedule the final reboot." \
+        | tee -a "$MOUNTED_WORKDIR_REL/$packages_log_filename" >>/dev/console
+    exit 1
+fi
+printf '%s\n' "Package installation complete; reboot scheduled." \
+    | tee -a "$MOUNTED_WORKDIR_REL/$packages_log_filename" >>/dev/console
+printf '<6>ABPP: Package installation complete; reboot scheduled.\n' >>/dev/kmsg
+if ! rm -rf "$MOUNTED_WORKDIR_REL"; then
+    echo "error: could not remove $MOUNTED_WORKDIR_REL after package installation." >/dev/console
+    exit 1
+fi
 EOF
 echo "First-boot package installation script created."
