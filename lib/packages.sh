@@ -86,16 +86,15 @@ __abpp_packages_excluded_list() {
     fi
 }
 
-# Function: abpp_packages_filter_excluded
+# Function: __abpp_packages_filter_excluded_list
 # Removes configured exclusions and comments/blank lines from a package list.
 #
 # Parameters:
 #   &0 -- The package names to filter.
-#   $1 -- Optional path to the UCI configuration file (defaults to /etc/config/abpp).
-abpp_packages_filter_excluded() {
-    local excluded
+#   $1 -- The configured excluded package names.
+__abpp_packages_filter_excluded_list() {
     local package
-    excluded="$(__abpp_packages_excluded_list "${1:-/etc/config/abpp}")" || return $?
+    local excluded="$1"
 
     while IFS= read -r package || [ -n "$package" ]; do
         case "$package" in
@@ -110,6 +109,18 @@ $package
         esac
         printf '%s\n' "$package"
     done
+}
+
+# Function: abpp_packages_filter_excluded
+# Removes configured exclusions and comments/blank lines from a package list.
+#
+# Parameters:
+#   &0 -- The package names to filter.
+#   $1 -- Optional path to the UCI configuration file (defaults to /etc/config/abpp).
+abpp_packages_filter_excluded() {
+    local excluded
+    excluded="$(__abpp_packages_excluded_list "${1:-/etc/config/abpp}")" || return $?
+    __abpp_packages_filter_excluded_list "$excluded"
 }
 
 # Function: __abpp_packages_list_installed
@@ -227,6 +238,20 @@ abpp_packages_list_user_installed() {
 # Function: abpp_packages_list_user_installed
 # Prints the list of all packages directly installed by the user.
 abpp_packages_list_user_installed_minimal() {
+    local excluded
+    local all_installed
+    local base_installed
+
+    excluded="$(__abpp_packages_excluded_list)" || return $?
+    all_installed="$(
+        abpp_packages_list_all_installed \
+            | __abpp_packages_filter_excluded_list "$excluded"
+    )" || return $?
+    base_installed="$(
+        abpp_packages_list_baseimage_installed \
+            | __abpp_packages_filter_excluded_list "$excluded"
+    )" || return $?
+
     # Resolve package dependencies and provides in such a way that
     # the only packages which do not appear more than once are
     # packages that the user installed.
@@ -235,10 +260,14 @@ abpp_packages_list_user_installed_minimal() {
     # as an alternate implementation of a library. Without having
     # support for set operations in ash, it's not possible to fix this.
     {
-        abpp_packages_list_all_installed
-        abpp_packages_list_baseimage_installed
-        abpp_packages_list_user_installed | abpp_packages_resolve_dependencies
-        abpp_packages_list_all_installed  | abpp_packages_resolve_provides | sed 'p;p'
+        printf '%s\n' "$all_installed"
+        printf '%s\n' "$base_installed"
+        {
+            printf '%s\n' "$all_installed"
+            printf '%s\n' "$base_installed"
+        } | grep -v '^$' | __abpp_packages_remove_nonunique | abpp_packages_resolve_dependencies
+        printf '%s\n' "$all_installed" | grep -v '^$' | abpp_packages_resolve_provides | sed 'p;p'
     }   | __abpp_packages_remove_nonunique \
-        | grep -vwF 'kernel'
+        | grep -vwF 'kernel' \
+        | __abpp_packages_filter_excluded_list "$excluded"
 }
