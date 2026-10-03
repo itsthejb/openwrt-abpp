@@ -113,17 +113,25 @@ set -o pipefail
 
 {
     echo "Starting staged package installation..."
+    printf '<6>ABPP: Starting staged package installation.\n' >>/dev/kmsg
     if ! $package_manager $package_install_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern; then
         echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2
         exit 1
     fi
 } 2>&1 | awk '
-    /^(Installing|Upgrading) / {
-        package = $0
-        sub(/^(Installing|Upgrading) /, "", package)
+    {
+        package = \$0
+        sub(/^[[:space:]]*/, "", package)
+        sub(/^\([0-9]+\/[0-9]+\)[[:space:]]*/, "", package)
+    }
+    /(^|[[:space:]])(Installing|Upgrading)[[:space:]]/ {
+        sub(/^.*(Installing|Upgrading)[[:space:]]+/, "", package)
         sub(/[[:space:]].*$/, "", package)
         count++
-        printf "Package %d: installing %s\n", count, package
+        progress = sprintf("Package %d: installing %s", count, package)
+        printf "<6>ABPP: %s\n", progress >> "/dev/kmsg"
+        close("/dev/kmsg")
+        print progress
         fflush()
     }
     { print; fflush() }
@@ -140,6 +148,7 @@ if ! echo 'reboot -d 10' >/etc/uci-defaults/99_abpp_reboot; then
 fi
 printf '%s\n' "Package installation complete; reboot scheduled." \
     | tee -a "$MOUNTED_WORKDIR_REL/$packages_log_filename" >>/dev/console
+printf '<6>ABPP: Package installation complete; reboot scheduled.\n' >>/dev/kmsg
 if ! rm -rf "$MOUNTED_WORKDIR_REL"; then
     echo "error: could not remove $MOUNTED_WORKDIR_REL after package installation." >/dev/console
     exit 1
