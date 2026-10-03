@@ -53,10 +53,15 @@ rsync)
         return 1
     fi
 
-    # The trailing slash copies all /etc contents, including dot-files. No
-    # --delete is used so target-release-only files and first-boot scripts stay.
+    # The trailing slash copies /etc contents, including dot-files. Keep the
+    # target release's package-manager configuration and world file: it contains
+    # repository settings and package constraints tied to that release.
     echo "Synchronizing /etc with rsync..."
-    if rsync -a /etc/ "$MOUNTED_ROOT/etc/"; then
+    if rsync -a \
+        --exclude=/apk/*** \
+        --exclude=/opkg/*** \
+        --exclude=/opkg.conf \
+        /etc/ "$MOUNTED_ROOT/etc/"; then
         :
     else
         status=$?
