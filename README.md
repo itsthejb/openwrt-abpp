@@ -283,10 +283,12 @@ config abpp 'main'
         list exclude_package 'luci-theme-argon'
 ```
 
-Configured exclusions are removed from the proposed package list and remain
-excluded even if added in the package-list editor. With no configuration file
-or no exclusion entries, all selected packages are handled as usual. Excluded
-packages are not installed by openwrt-abpp after reboot.
+Configured exclusions are omitted before openwrt-abpp infers the proposed
+package list, so they do not contribute packages through dependency or
+provides analysis. They remain excluded even if added in the package-list
+editor. This affects migration only; packages already present in the new
+release are not uninstalled. With no configuration file or no exclusion
+entries, all selected packages are handled as usual.
 
 ## How it Works
 
