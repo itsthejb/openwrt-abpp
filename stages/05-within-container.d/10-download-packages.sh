@@ -110,6 +110,11 @@ echo "Preparing uci-default to install packages..."
 touch "$MOUNTED_ROOT/etc/uci-defaults/99_abpp_reboot"
 cat <<EOF >"$MOUNTED_ROOT/etc/uci-defaults/01_abpp_01_install_packages"
 set -o pipefail
+set -- "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern
+package_total=\$#
+if [ "\$package_total" -eq 1 ] && ! [ -f "\$1" ]; then
+    package_total=0
+fi
 
 {
     echo "Starting staged package installation..."
@@ -118,7 +123,7 @@ set -o pipefail
         echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2
         exit 1
     fi
-} 2>&1 | awk '
+} 2>&1 | awk -v total="\$package_total" '
     {
         package = \$0
         sub(/^[[:space:]]*/, "", package)
@@ -128,7 +133,7 @@ set -o pipefail
         sub(/^.*(Installing|Upgrading)[[:space:]]+/, "", package)
         sub(/[[:space:]].*$/, "", package)
         count++
-        progress = sprintf("Package %d: installing %s", count, package)
+        progress = sprintf("Package %d/%d: installing %s", count, total, package)
         printf "<6>ABPP: %s\n", progress >> "/dev/kmsg"
         close("/dev/kmsg")
         print progress
