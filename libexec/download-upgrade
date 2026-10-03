@@ -114,6 +114,14 @@ if [ "${REALLY_BAD_IDEA:-}" != "iknow" ]; then
             fi
             exit 3
         fi
+        # The pinned fingerprint establishes this key's identity; trust it only
+        # in this temporary keyring so GnuPG can verify its signature cleanly.
+        ownertrust_file="$temp/openwrt-release-ownertrust.txt"
+        printf '%s:6:\n' "$OPENWRT_GPG_KEY_FINGERPRINT" >"$ownertrust_file"
+        if ! GNUPGHOME="$gpg_home" gpg --batch --import-ownertrust "$ownertrust_file"; then
+            echo "error: failed to trust the pinned OpenWrt signing key." 1>&2
+            exit 3
+        fi
         if ! GNUPGHOME="$gpg_home" gpg --batch --quiet \
             --verify "$temp/sha256sums.asc" "$temp/sha256sums"
         then
