@@ -258,16 +258,40 @@ removed before reboot; if installation fails, the directory and log are kept for
 
 ### Booting the other partition without upgrading
 
-You can boot an OpenWrt installation already present on the other partition without running `abupgrade`. Restart the
-device and select the desired `OpenWrt <version>` entry in the GRUB menu before its five-second timeout expires. GRUB
-will boot the selected installation for this startup; this does not flash either partition or change the default for
-future boots.
+You can boot an OpenWrt installation already present on the other partition without running `abupgrade`. If you have
+console access, select the desired `OpenWrt <version>` entry in the GRUB menu before its five-second timeout expires.
+This selects it for this startup without flashing either partition or changing the default for future boots.
 
-To make that installation the default on future boots, edit `set default="..."` in `boot/grub/grub.cfg` on the EFI
-partition and set it to the zero-based position of the desired normal OpenWrt entry. Count all `menuentry` entries in
-order, including failsafe entries, and check the actual generated configuration rather than assuming a fixed index.
-After an upgrade, each installed version normally has a regular and a failsafe entry, so the other version's regular
-entry may not be index `1`.
+#### Switching over SSH
+
+The documented GRUB configuration uses a fixed `set default="0"` and does not configure GRUB's one-shot `next_entry`
+mechanism. To switch remotely, change the default entry in GRUB's config over SSH, then reboot. First find the GRUB
+entry indexes and EFI partition:
+
+```sh
+ABPP=/path/to/openwrt-abpp
+EFI_PARTITION="$("$ABPP/libexec/otherpart-info" EFI_PARTITION)"
+mkdir -p /mnt/efi
+mount "$EFI_PARTITION" /mnt/efi
+GRUB_CFG=/mnt/efi/boot/grub/grub.cfg
+awk '/^[[:space:]]*menuentry[[:space:]]/ { printf "%d: %s\n", n++, $0 }' "$GRUB_CFG"
+grep '^[[:space:]]*set default=' "$GRUB_CFG"
+```
+
+Replace `/path/to/openwrt-abpp` with the directory where you extracted the project. The `awk` output shows each
+`menuentry` with its zero-based GRUB index; match the version you want to boot. Failsafe entries count too. Edit the
+`set default="..."` line in `$GRUB_CFG` to that index, save the file, and reboot. This does not run an upgrade or
+flash either partition; it changes which GRUB entry is started.
+
+To make the switch effectively one-time, note the original default before changing it. After the other installation
+has booted and you can SSH into it, mount the EFI partition again if needed and restore the original `set default`
+value. The other installation will then remain the default for only the intervening boot. This is a manual restore,
+not an automatic one-shot boot: if the device is unreachable after switching, you may need console access to restore
+the setting. To keep using the other installation, leave its index as the default instead.
+
+If the EFI partition is already mounted, use its existing mount point instead of mounting it again at `/mnt/efi`.
+After an upgrade, each installed version normally has a regular and a failsafe entry, so do not assume the other
+version's regular entry is always index `1`; inspect the generated config as above.
 
 ### Choosing a configuration migration method
 
