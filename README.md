@@ -113,7 +113,7 @@ The `grub.cfg` file is located on partition 1.
 mkdir -p /mnt/efi
 mount -t vfat /dev/sda1 /mnt/efi
 mv /mnt/efi/boot/vmlinuz /mnt/efi/boot/vmlinuz-a
-nano /mnt/efi/boot/grub/grub.cfg
+vi /mnt/efi/boot/grub/grub.cfg
 ```
 
 The original GRUB config will like something like this:
@@ -255,6 +255,29 @@ the package manager installs it. The total counts the install and upgrade operat
 installation plan, excluding staged archives that are already installed. Output is saved to
 `/abpp-upgrading/packages-install.log` while installation runs. After a successful installation, `/abpp-upgrading` is
 removed before reboot; if installation fails, the directory and log are kept for troubleshooting.
+
+### Booting the other partition without upgrading
+
+You can boot an OpenWrt installation already present on the other partition without running `abupgrade`. If you have
+console access, select the desired `OpenWrt <version>` entry in the GRUB menu before its five-second timeout expires.
+This selects it for this startup without flashing either partition or changing the default for future boots.
+
+#### Switching over SSH
+
+To switch remotely, edit the GRUB configuration over SSH. Find and mount the EFI partition, then open its config in
+`vi`:
+
+```sh
+ABPP=/path/to/openwrt-abpp
+EFI_PARTITION="$("$ABPP/libexec/otherpart-info" EFI_PARTITION)"
+mkdir -p /mnt/efi
+mount "$EFI_PARTITION" /mnt/efi
+vi /mnt/efi/boot/grub/grub.cfg
+```
+
+Change `set default="0"` near the top of the file to `set default="<index>"`, using the index of the desired entry.
+Save the file and reboot. This changes only which existing installation GRUB boots; it does not run an upgrade or
+flash either partition.
 
 ### Choosing a configuration migration method
 
