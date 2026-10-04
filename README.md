@@ -256,6 +256,19 @@ installation plan, excluding staged archives that are already installed. Output 
 `/abpp-upgrading/packages-install.log` while installation runs. After a successful installation, `/abpp-upgrading` is
 removed before reboot; if installation fails, the directory and log are kept for troubleshooting.
 
+### Booting the other partition without upgrading
+
+You can boot an OpenWrt installation already present on the other partition without running `abupgrade`. Restart the
+device and select the desired `OpenWrt <version>` entry in the GRUB menu before its five-second timeout expires. GRUB
+will boot the selected installation for this startup; this does not flash either partition or change the default for
+future boots.
+
+To make that installation the default on future boots, edit `set default="..."` in `boot/grub/grub.cfg` on the EFI
+partition and set it to the zero-based position of the desired normal OpenWrt entry. Count all `menuentry` entries in
+order, including failsafe entries, and check the actual generated configuration rather than assuming a fixed index.
+After an upgrade, each installed version normally has a regular and a failsafe entry, so the other version's regular
+entry may not be index `1`.
+
 ### Choosing a configuration migration method
 
 By default, openwrt-abpp uses `sysupgrade` to back up the current configuration and restore it on the new partition's
