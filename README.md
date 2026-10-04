@@ -85,6 +85,11 @@ Next, use `parted` to rename each of the partitions:
 > Partition `10` and `11` **must** be named `OpenWrt-A` and `OpenWrt-B` respectively.  
 > The partition name is used by `abupgrade` to detect which partition to flash.
 
+The device paths depend on the disk type: partition 10 is `/dev/sda10` on an
+SATA disk, but `/dev/nvme0n1p10` on NVMe (and `/dev/mmcblk0p10` on eMMC).
+`abupgrade` supports these device naming schemes and finds the A/B partitions
+by their labels, even when other partition numbers are present.
+
 You will need the partition UUIDs for `OpenWrt-A` later, so make sure to
 find it using `blkid` and write it down:
 
@@ -113,7 +118,7 @@ The `grub.cfg` file is located on partition 1.
 mkdir -p /mnt/efi
 mount -t vfat /dev/sda1 /mnt/efi
 mv /mnt/efi/boot/vmlinuz /mnt/efi/boot/vmlinuz-a
-nano /mnt/efi/boot/grub/grub.cfg
+vi /mnt/efi/boot/grub/grub.cfg
 ```
 
 The original GRUB config will like something like this:
@@ -206,9 +211,12 @@ You may now reboot into OpenWrt.
 
 ### Changes within OpenWrt
 
-Once you have booted into OpenWrt and have internet connectivity, you will need to
-install the following packages using the package manager available on your
-installation (`apk` is preferred when both are available):
+Once you have booted into OpenWrt, ensure the device has internet connectivity.
+After you confirm the target version and packages to carry over and the release
+has downloaded, `abupgrade` automatically installs any missing required
+packages using the package manager available on your installation (`apk` is
+preferred when both are available). This happens before partition discovery,
+which requires some of these tools:
 
  * `blkid`
  * `block-mount`
@@ -222,6 +230,8 @@ installation (`apk` is preferred when both are available):
  * `squashfs-tools-unsquashfs`
  * `unshare`
 
+Package indexes must be reachable when these packages are installed. The
+package manager's index update runs before installation.
 `rsync` is used when `config_migration` is set to `rsync` in `/etc/config/abpp`.
 
 After installing the packages, configure partition 2
@@ -255,6 +265,29 @@ it. Output is saved to `/abpp-upgrading/packages-install.log` while installation
 installation, `/abpp-upgrading` is removed before reboot; if installation fails, the directory and log are kept for
 troubleshooting.
 
+### Booting the other partition without upgrading
+
+You can boot an OpenWrt installation already present on the other partition without running `abupgrade`. If you have
+console access, select the desired `OpenWrt <version>` entry in the GRUB menu before its five-second timeout expires.
+This selects it for this startup without flashing either partition or changing the default for future boots.
+
+#### Switching over SSH
+
+To switch remotely, edit the GRUB configuration over SSH. Find and mount the EFI partition, then open its config in
+`vi`:
+
+```sh
+ABPP=/path/to/openwrt-abpp
+EFI_PARTITION="$("$ABPP/libexec/otherpart-info" EFI_PARTITION)"
+mkdir -p /mnt/efi
+mount "$EFI_PARTITION" /mnt/efi
+vi /mnt/efi/boot/grub/grub.cfg
+```
+
+Change `set default="0"` near the top of the file to `set default="<index>"`, using the index of the desired entry.
+Save the file and reboot. This changes only which existing installation GRUB boots; it does not run an upgrade or
+flash either partition.
+
 ### Choosing a configuration migration method
 
 By default, openwrt-abpp uses `sysupgrade` to back up the current configuration and restore it on the new partition's
@@ -268,10 +301,10 @@ config abpp 'main'
 The supported values are `sysupgrade` and `rsync`. If `/etc/config/abpp` or the option is absent, `sysupgrade` is
 used. The `rsync` method copies the contents of `/etc`, including dot-files and hidden directories, to the new
 partition before reboot. It overwrites matching entries but does not delete target-only files, preserving defaults
-and first-boot scripts from the new OpenWrt release. It also leaves `/etc/apk` and `/etc/opkg` (including APK's
-`world` file and package feed settings) untouched so package constraints and feeds from the active release do not
-interfere with package installation on the target release. Install the `rsync` package on the active system before
-selecting this method.
+and first-boot scripts from the new OpenWrt release. It also leaves `/etc/apk`, `/etc/opkg`, `/etc/banner`, and
+`/etc/banner.failsafe` untouched so package constraints, feeds, and release-specific banners from the active release
+do not overwrite the target release's files. Install the `rsync` package on the active system before selecting this
+method.
 
 ### Excluding packages from migration
 
@@ -291,6 +324,10 @@ provides analysis. They remain excluded even if added in the package-list
 editor. This affects migration only; packages already present in the new
 release are not uninstalled. With no configuration file or no exclusion
 entries, all selected packages are handled as usual.
+
+For APK-based installations, inferred migration candidates are limited to
+packages reported as currently installed by APK. Packages removed from the
+running installation are not re-added based on package database records.
 
 ## How it Works
 

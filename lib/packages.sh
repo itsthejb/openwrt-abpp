@@ -38,6 +38,74 @@ abpp_packages_manager() {
     fi
 }
 
+# Function: abpp_packages_ensure_installed
+# Installs any missing packages using the active package manager.
+#
+# Parameters:
+#   &0 -- Package names to ensure are installed.
+abpp_packages_ensure_installed() {
+    local manager installed package missing
+
+    if [ "$#" -eq 0 ]; then
+        echo "error: no packages specified for installation." 1>&2
+        return 10
+    fi
+
+    manager="$(abpp_packages_manager)" || return $?
+    case "$manager" in
+        apk)
+            if ! installed="$(apk info)"; then
+                echo "error: could not query installed APK packages." 1>&2
+                return 1
+            fi
+            ;;
+        opkg)
+            if ! installed="$(opkg list-installed)"; then
+                echo "error: could not query installed opkg packages." 1>&2
+                return 1
+            fi
+            ;;
+        *)
+            echo "error: unsupported package manager: $manager" 1>&2
+            return 127
+            ;;
+    esac
+
+    missing=""
+    for package in "$@"; do
+        case "$package" in
+            ""|*[!a-zA-Z0-9._+-]*)
+                echo "error: invalid package name: $package" 1>&2
+                return 10
+                ;;
+        esac
+        if ! printf '%s\n' "$installed" | awk -v package="$package" '$1 == package { found = 1 } END { exit !found }'; then
+            missing="${missing}${missing:+ }$package"
+        fi
+    done
+
+    if [ -z "$missing" ]; then
+        return 0
+    fi
+
+    echo "Installing required packages: $missing" 1>&2
+    set -- $missing
+    case "$manager" in
+        apk)
+            if ! apk update || ! apk add "$@"; then
+                echo "error: failed to install required packages: $missing" 1>&2
+                return 1
+            fi
+            ;;
+        opkg)
+            if ! opkg update || ! opkg install "$@"; then
+                echo "error: failed to install required packages: $missing" 1>&2
+                return 1
+            fi
+            ;;
+    esac
+}
+
 # Function: __abpp_packages_excluded_list
 # Prints the configured package exclusions, if any.
 #
@@ -111,6 +179,30 @@ $package
     done
 }
 
+# Function: __abpp_packages_filter_installed_list
+# Removes packages that are not present in the active installed-package list.
+#
+# Parameters:
+#   &0 -- The package names to filter.
+#   $1 -- The active installed package names.
+__abpp_packages_filter_installed_list() {
+    local package
+    local installed="$1"
+
+    while IFS= read -r package || [ -n "$package" ]; do
+        case "$package" in
+            ""|\#*) continue ;;
+        esac
+        case "
+$installed
+" in
+            *"
+$package
+"*) printf '%s\n' "$package" ;;
+        esac
+    done
+}
+
 # Function: abpp_packages_filter_excluded
 # Removes configured exclusions and comments/blank lines from a package list.
 #
@@ -130,8 +222,17 @@ abpp_packages_filter_excluded() {
 #   $1 -- The root directory to query.
 __abpp_packages_list_installed() {
     local root="$1"
+    local installed
     case "$(abpp_packages_manager "$root")" in
         apk)
+            if [ "$root" = "/" ]; then
+                if ! installed="$(apk list --installed --manifest)"; then
+                    echo "error: could not query installed APK packages." 1>&2
+                    return 1
+                fi
+                printf '%s\n' "$installed" | awk 'NF { print $1 }'
+                return 0
+            fi
             awk 'substr($0, 1, 2) == "P:" { print substr($0, 3) }' \
                 "$root/lib/apk/db/installed"
             ;;
@@ -269,5 +370,6 @@ abpp_packages_list_user_installed_minimal() {
         printf '%s\n' "$all_installed" | grep -v '^$' | abpp_packages_resolve_provides | sed 'p;p'
     }   | __abpp_packages_remove_nonunique \
         | grep -vwF 'kernel' \
+        | __abpp_packages_filter_installed_list "$all_installed" \
         | __abpp_packages_filter_excluded_list "$excluded"
 }
