@@ -54,13 +54,14 @@ rsync)
     fi
 
     # The trailing slash copies /etc contents, including dot-files. Keep the
-    # target release's package-manager configuration and world file: it contains
-    # repository settings and package constraints tied to that release.
+    # target release's package-manager configuration, world file, and banners.
     echo "Synchronizing /etc with rsync..."
     if rsync -a \
         --exclude=/apk/*** \
         --exclude=/opkg/*** \
         --exclude=/opkg.conf \
+        --exclude=/banner \
+        --exclude=/banner.failsafe \
         /etc/ "$MOUNTED_ROOT/etc/"; then
         :
     else

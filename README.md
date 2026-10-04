@@ -294,10 +294,10 @@ config abpp 'main'
 The supported values are `sysupgrade` and `rsync`. If `/etc/config/abpp` or the option is absent, `sysupgrade` is
 used. The `rsync` method copies the contents of `/etc`, including dot-files and hidden directories, to the new
 partition before reboot. It overwrites matching entries but does not delete target-only files, preserving defaults
-and first-boot scripts from the new OpenWrt release. It also leaves `/etc/apk` and `/etc/opkg` (including APK's
-`world` file and package feed settings) untouched so package constraints and feeds from the active release do not
-interfere with package installation on the target release. Install the `rsync` package on the active system before
-selecting this method.
+and first-boot scripts from the new OpenWrt release. It also leaves `/etc/apk`, `/etc/opkg`, `/etc/banner`, and
+`/etc/banner.failsafe` untouched so package constraints, feeds, and release-specific banners from the active release
+do not overwrite the target release's files. Install the `rsync` package on the active system before selecting this
+method.
 
 ### Excluding packages from migration
 
