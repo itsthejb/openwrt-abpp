@@ -48,11 +48,9 @@ if [ "$package_manager" = apk ]; then
     # authenticated their checksums through the trusted repository index when
     # fetching them. Permit those verified local archives during offline install.
     package_install_command="add --allow-untrusted --no-network --repositories-file /dev/null --force-non-repository"
-    package_plan_command="$package_manager $package_install_command --simulate"
     package_archive_pattern="*.apk"
 else
     package_install_command="install"
-    package_plan_command="$package_manager --noaction $package_install_command"
     package_archive_pattern="*.ipk"
 fi
 
@@ -112,30 +110,6 @@ echo "Preparing uci-default to install packages..."
 touch "$MOUNTED_ROOT/etc/uci-defaults/99_abpp_reboot"
 cat <<EOF >"$MOUNTED_ROOT/etc/uci-defaults/01_abpp_01_install_packages"
 set -o pipefail
-package_plan_log="\$(mktemp)" || {
-    echo "error: could not create a package installation plan log." \
-        | tee -a "$MOUNTED_WORKDIR_REL/$packages_log_filename" >/dev/console
-    exit 1
-}
-if ! $package_plan_command "$MOUNTED_WORKDIR_REL/$packages_dirname"/$package_archive_pattern \
-    >"\$package_plan_log" 2>&1; then
-    tee -a "$MOUNTED_WORKDIR_REL/$packages_log_filename" <"\$package_plan_log" >/dev/console
-    printf '%s\n' "error: could not determine the staged package installation plan." \
-        | tee -a "$MOUNTED_WORKDIR_REL/$packages_log_filename" >/dev/console
-    rm -f "\$package_plan_log"
-    exit 1
-fi
-package_total="\$(awk '
-    /(^|[[:space:]])(Installing|Upgrading)[[:space:]]/ { count++ }
-    END { print count+0 }
-' "\$package_plan_log")" || {
-    echo "error: could not count planned package installations." \
-        | tee -a "$MOUNTED_WORKDIR_REL/$packages_log_filename" >/dev/console
-    rm -f "\$package_plan_log"
-    exit 1
-}
-rm -f "\$package_plan_log"
-
 {
     echo "Starting staged package installation..."
     printf '<6>ABPP: Starting staged package installation.\n' >>/dev/kmsg
@@ -143,7 +117,7 @@ rm -f "\$package_plan_log"
         echo "error: failed to install staged packages; leaving them in $MOUNTED_WORKDIR_REL/$packages_dirname" 1>&2
         exit 1
     fi
-} 2>&1 | awk -v total="\$package_total" '
+} 2>&1 | awk '
     {
         package = \$0
         sub(/^[[:space:]]*/, "", package)
@@ -152,8 +126,7 @@ rm -f "\$package_plan_log"
     /(^|[[:space:]])(Installing|Upgrading)[[:space:]]/ {
         sub(/^.*(Installing|Upgrading)[[:space:]]+/, "", package)
         sub(/[[:space:]].*$/, "", package)
-        count++
-        progress = sprintf("Package %d/%d: installing %s", count, total, package)
+        progress = sprintf("Installing package %s", package)
         printf "<6>ABPP: %s\n", progress >> "/dev/kmsg"
         close("/dev/kmsg")
         print progress
