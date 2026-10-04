@@ -275,18 +275,9 @@ mount "$EFI_PARTITION" /mnt/efi
 vi /mnt/efi/boot/grub/grub.cfg
 ```
 
-Replace `/path/to/openwrt-abpp` with the directory where you extracted the project. In `vi`, find the normal
-`menuentry` for the version you want and count all preceding `menuentry` blocks from zero; failsafe entries count.
 Change `set default="0"` near the top of the file to `set default="<index>"`, using the index of the desired entry.
 Save the file and reboot. This changes only which existing installation GRUB boots; it does not run an upgrade or
 flash either partition.
-
-To boot the other installation only once, note the original default before editing. After the other installation has
-booted and you can SSH into it, mount the EFI partition again if needed, open `grub.cfg` in `vi`, and restore the
-original default value. To keep using the other installation, leave its index as the default instead.
-
-If the EFI partition is already mounted, use its existing mount point instead of mounting it again at `/mnt/efi`.
-Do not assume the other version's regular entry is always index `1`; inspect the entries in your generated config.
 
 ### Choosing a configuration migration method
 
