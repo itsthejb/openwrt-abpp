@@ -113,7 +113,7 @@ The `grub.cfg` file is located on partition 1.
 mkdir -p /mnt/efi
 mount -t vfat /dev/sda1 /mnt/efi
 mv /mnt/efi/boot/vmlinuz /mnt/efi/boot/vmlinuz-a
-nano /mnt/efi/boot/grub/grub.cfg
+vi /mnt/efi/boot/grub/grub.cfg
 ```
 
 The original GRUB config will like something like this:
@@ -216,7 +216,6 @@ installation (`apk` is preferred when both are available):
  * `kmod-fs-squashfs`
  * `kmod-fs-vfat`
  * `losetup`
- * `nano`
  * `nsenter`
  * `parted`
  * `rsync`
@@ -266,24 +265,24 @@ This selects it for this startup without flashing either partition or changing t
 #### Switching over SSH
 
 To switch remotely, edit the GRUB configuration over SSH. Find and mount the EFI partition, then open its config in
-`nano`:
+`vi`:
 
 ```sh
 ABPP=/path/to/openwrt-abpp
 EFI_PARTITION="$("$ABPP/libexec/otherpart-info" EFI_PARTITION)"
 mkdir -p /mnt/efi
 mount "$EFI_PARTITION" /mnt/efi
-nano /mnt/efi/boot/grub/grub.cfg
+vi /mnt/efi/boot/grub/grub.cfg
 ```
 
-Replace `/path/to/openwrt-abpp` with the directory where you extracted the project. In `nano`, find the normal
+Replace `/path/to/openwrt-abpp` with the directory where you extracted the project. In `vi`, find the normal
 `menuentry` for the version you want and count all preceding `menuentry` blocks from zero; failsafe entries count.
-Set `set default="..."` near the top of the file to that index. Save with `Ctrl+O`, press Enter, exit with `Ctrl+X`,
-then reboot. This changes only which existing installation GRUB boots; it does not run an upgrade or flash either
-partition.
+Change `set default="0"` near the top of the file to `set default="<index>"`, using the index of the desired entry.
+Save the file and reboot. This changes only which existing installation GRUB boots; it does not run an upgrade or
+flash either partition.
 
 To boot the other installation only once, note the original default before editing. After the other installation has
-booted and you can SSH into it, mount the EFI partition again if needed, open `grub.cfg` in `nano`, and restore the
+booted and you can SSH into it, mount the EFI partition again if needed, open `grub.cfg` in `vi`, and restore the
 original default value. To keep using the other installation, leave its index as the default instead.
 
 If the EFI partition is already mounted, use its existing mount point instead of mounting it again at `/mnt/efi`.
