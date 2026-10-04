@@ -206,9 +206,10 @@ You may now reboot into OpenWrt.
 
 ### Changes within OpenWrt
 
-Once you have booted into OpenWrt and have internet connectivity, you will need to
-install the following packages using the package manager available on your
-installation (`apk` is preferred when both are available):
+Once you have booted into OpenWrt, ensure the device has internet connectivity.
+`abupgrade` automatically installs any missing required packages using the
+package manager available on your installation (`apk` is preferred when both
+are available):
 
  * `blkid`
  * `block-mount`
@@ -222,6 +223,7 @@ installation (`apk` is preferred when both are available):
  * `squashfs-tools-unsquashfs`
  * `unshare`
 
+Package indexes must be reachable the first time these packages are installed.
 `rsync` is used when `config_migration` is set to `rsync` in `/etc/config/abpp`.
 
 After installing the packages, configure partition 2
