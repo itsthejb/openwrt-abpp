@@ -11,6 +11,8 @@
 # If any script fails, this script will exit.
 # If an upgrade is left incomplete, you may re-run this script to resume it.
 # ---------------------------------------------------------------------------------------------------------------------
+# Required packages are installed automatically when missing.
+# ---------------------------------------------------------------------------------------------------------------------
 set -euo pipefail
 SCRIPTS="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 source "$SCRIPTS/config"
@@ -34,6 +36,23 @@ case "$1" in
 esac
 shift
 done
+
+# ---------------------------------------------------------------------------------------------------------------------
+# ==> Ensure required packages are installed.
+if ! "$OPT_ABANDON"; then
+    abpp_packages_ensure_installed \
+        blkid \
+        block-mount \
+        dumb-init \
+        kmod-fs-squashfs \
+        kmod-fs-vfat \
+        losetup \
+        nsenter \
+        parted \
+        rsync \
+        squashfs-tools-unsquashfs \
+        unshare
+fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 # ==> Set up environment.

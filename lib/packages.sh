@@ -38,6 +38,72 @@ abpp_packages_manager() {
     fi
 }
 
+# Function: abpp_packages_ensure_installed
+# Installs any missing packages using the active package manager.
+#
+# Parameters:
+#   &0 -- Package names to ensure are installed.
+abpp_packages_ensure_installed() {
+    local manager installed package missing
+
+    if [ "$#" -eq 0 ]; then
+        echo "error: no packages specified for installation." 1>&2
+        return 10
+    fi
+
+    manager="$(abpp_packages_manager)" || return $?
+    case "$manager" in
+        apk)
+            if ! installed="$(apk info)"; then
+                echo "error: could not query installed APK packages." 1>&2
+                return 1
+            fi
+            ;;
+        opkg)
+            if ! installed="$(opkg list-installed)"; then
+                echo "error: could not query installed opkg packages." 1>&2
+                return 1
+            fi
+            ;;
+        *)
+            echo "error: unsupported package manager: $manager" 1>&2
+            return 127
+            ;;
+    esac
+
+    missing=""
+    for package in "$@"; do
+        case "$package" in
+            ""|*[!a-zA-Z0-9._+-]*)
+                echo "error: invalid package name: $package" 1>&2
+                return 10
+                ;;
+        esac
+        if ! printf '%s\n' "$installed" | awk -v package="$package" '$1 == package { found = 1 } END { exit !found }'; then
+            missing="${missing}${missing:+ }$package"
+        fi
+    done
+
+    if [ -z "$missing" ]; then
+        return 0
+    fi
+    echo "Installing required packages: $missing" 1>&2
+    case "$manager" in
+        apk)
+            if ! apk update || ! apk add "$@"; then
+                echo "error: failed to install required packages: $missing" 1>&2
+                return 1
+            fi
+            ;;
+        opkg)
+            if ! opkg update || ! opkg install "$@"; then
+                echo "error: failed to install required packages: $missing" 1>&2
+                return 1
+            fi
+            ;;
+    esac
+}
+
 # Function: __abpp_packages_excluded_list
 # Prints the configured package exclusions, if any.
 #
