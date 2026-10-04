@@ -85,6 +85,11 @@ Next, use `parted` to rename each of the partitions:
 > Partition `10` and `11` **must** be named `OpenWrt-A` and `OpenWrt-B` respectively.  
 > The partition name is used by `abupgrade` to detect which partition to flash.
 
+The device paths depend on the disk type: partition 10 is `/dev/sda10` on an
+SATA disk, but `/dev/nvme0n1p10` on NVMe (and `/dev/mmcblk0p10` on eMMC).
+`abupgrade` supports these device naming schemes and finds the A/B partitions
+by their labels, even when other partition numbers are present.
+
 You will need the partition UUIDs for `OpenWrt-A` later, so make sure to
 find it using `blkid` and write it down:
 
