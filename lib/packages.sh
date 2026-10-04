@@ -177,6 +177,30 @@ $package
     done
 }
 
+# Function: __abpp_packages_filter_installed_list
+# Removes packages that are not present in the active installed-package list.
+#
+# Parameters:
+#   &0 -- The package names to filter.
+#   $1 -- The active installed package names.
+__abpp_packages_filter_installed_list() {
+    local package
+    local installed="$1"
+
+    while IFS= read -r package || [ -n "$package" ]; do
+        case "$package" in
+            ""|\#*) continue ;;
+        esac
+        case "
+$installed
+" in
+            *"
+$package
+"*) printf '%s\n' "$package" ;;
+        esac
+    done
+}
+
 # Function: abpp_packages_filter_excluded
 # Removes configured exclusions and comments/blank lines from a package list.
 #
@@ -196,8 +220,17 @@ abpp_packages_filter_excluded() {
 #   $1 -- The root directory to query.
 __abpp_packages_list_installed() {
     local root="$1"
+    local installed
     case "$(abpp_packages_manager "$root")" in
         apk)
+            if [ "$root" = "/" ]; then
+                if ! installed="$(apk list --installed --manifest)"; then
+                    echo "error: could not query installed APK packages." 1>&2
+                    return 1
+                fi
+                printf '%s\n' "$installed" | awk 'NF { print $1 }'
+                return 0
+            fi
             awk 'substr($0, 1, 2) == "P:" { print substr($0, 3) }' \
                 "$root/lib/apk/db/installed"
             ;;
@@ -335,5 +368,6 @@ abpp_packages_list_user_installed_minimal() {
         printf '%s\n' "$all_installed" | grep -v '^$' | abpp_packages_resolve_provides | sed 'p;p'
     }   | __abpp_packages_remove_nonunique \
         | grep -vwF 'kernel' \
+        | __abpp_packages_filter_installed_list "$all_installed" \
         | __abpp_packages_filter_excluded_list "$excluded"
 }

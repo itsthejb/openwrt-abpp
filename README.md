@@ -253,9 +253,10 @@ script. It will:
 Once you reboot into the newly-flashed partition, openwrt-abpp will restore your configuration, install your packages,
 and trigger a reboot to finalize everything. First-boot package installation progress is written to the kernel message
 log via `/dev/kmsg` and displayed on the boot console, including a numbered `current/total` message for each package as
-the package manager installs it. The total is the number of staged package archives. Output is saved to
-`/abpp-upgrading/packages-install.log` while installation runs. After a successful installation, `/abpp-upgrading` is
-removed before reboot; if installation fails, the directory and log are kept for troubleshooting.
+ the package manager installs or upgrades it. The total is the number of install and upgrade operations in the package
+ manager's installation plan. Output is saved to `/abpp-upgrading/packages-install.log` while installation runs. After
+ a successful installation, `/abpp-upgrading` is removed before reboot; if installation fails, the directory and log
+ are kept for troubleshooting.
 
 ### Booting the other partition without upgrading
 
@@ -316,6 +317,10 @@ provides analysis. They remain excluded even if added in the package-list
 editor. This affects migration only; packages already present in the new
 release are not uninstalled. With no configuration file or no exclusion
 entries, all selected packages are handled as usual.
+
+For APK-based installations, inferred migration candidates are limited to
+packages reported as currently installed by APK. Packages removed from the
+running installation are not re-added based on package database records.
 
 ## How it Works
 
