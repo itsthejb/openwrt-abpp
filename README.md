@@ -207,9 +207,11 @@ You may now reboot into OpenWrt.
 ### Changes within OpenWrt
 
 Once you have booted into OpenWrt, ensure the device has internet connectivity.
-`abupgrade` automatically installs any missing required packages using the
-package manager available on your installation (`apk` is preferred when both
-are available):
+After you confirm the target version and packages to carry over and the release
+has downloaded, `abupgrade` automatically installs any missing required
+packages using the package manager available on your installation (`apk` is
+preferred when both are available). This happens before partition discovery,
+which requires some of these tools:
 
  * `blkid`
  * `block-mount`
@@ -223,7 +225,8 @@ are available):
  * `squashfs-tools-unsquashfs`
  * `unshare`
 
-Package indexes must be reachable the first time these packages are installed.
+Package indexes must be reachable when these packages are installed. The
+package manager's index update runs before installation.
 `rsync` is used when `config_migration` is set to `rsync` in `/etc/config/abpp`.
 
 After installing the packages, configure partition 2

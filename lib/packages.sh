@@ -87,7 +87,9 @@ abpp_packages_ensure_installed() {
     if [ -z "$missing" ]; then
         return 0
     fi
+
     echo "Installing required packages: $missing" 1>&2
+    set -- $missing
     case "$manager" in
         apk)
             if ! apk update || ! apk add "$@"; then
