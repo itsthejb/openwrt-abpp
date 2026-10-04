@@ -216,6 +216,7 @@ installation (`apk` is preferred when both are available):
  * `kmod-fs-squashfs`
  * `kmod-fs-vfat`
  * `losetup`
+ * `nano`
  * `nsenter`
  * `parted`
  * `rsync`
@@ -264,34 +265,29 @@ This selects it for this startup without flashing either partition or changing t
 
 #### Switching over SSH
 
-The documented GRUB configuration uses a fixed `set default="0"` and does not configure GRUB's one-shot `next_entry`
-mechanism. To switch remotely, change the default entry in GRUB's config over SSH, then reboot. First find the GRUB
-entry indexes and EFI partition:
+To switch remotely, edit the GRUB configuration over SSH. Find and mount the EFI partition, then open its config in
+`nano`:
 
 ```sh
 ABPP=/path/to/openwrt-abpp
 EFI_PARTITION="$("$ABPP/libexec/otherpart-info" EFI_PARTITION)"
 mkdir -p /mnt/efi
 mount "$EFI_PARTITION" /mnt/efi
-GRUB_CFG=/mnt/efi/boot/grub/grub.cfg
-awk '/^[[:space:]]*menuentry[[:space:]]/ { printf "%d: %s\n", n++, $0 }' "$GRUB_CFG"
-grep '^[[:space:]]*set default=' "$GRUB_CFG"
+nano /mnt/efi/boot/grub/grub.cfg
 ```
 
-Replace `/path/to/openwrt-abpp` with the directory where you extracted the project. The `awk` output shows each
-`menuentry` with its zero-based GRUB index; match the version you want to boot. Failsafe entries count too. Edit the
-`set default="..."` line in `$GRUB_CFG` to that index, save the file, and reboot. This does not run an upgrade or
-flash either partition; it changes which GRUB entry is started.
+Replace `/path/to/openwrt-abpp` with the directory where you extracted the project. In `nano`, find the normal
+`menuentry` for the version you want and count all preceding `menuentry` blocks from zero; failsafe entries count.
+Set `set default="..."` near the top of the file to that index. Save with `Ctrl+O`, press Enter, exit with `Ctrl+X`,
+then reboot. This changes only which existing installation GRUB boots; it does not run an upgrade or flash either
+partition.
 
-To make the switch effectively one-time, note the original default before changing it. After the other installation
-has booted and you can SSH into it, mount the EFI partition again if needed and restore the original `set default`
-value. The other installation will then remain the default for only the intervening boot. This is a manual restore,
-not an automatic one-shot boot: if the device is unreachable after switching, you may need console access to restore
-the setting. To keep using the other installation, leave its index as the default instead.
+To boot the other installation only once, note the original default before editing. After the other installation has
+booted and you can SSH into it, mount the EFI partition again if needed, open `grub.cfg` in `nano`, and restore the
+original default value. To keep using the other installation, leave its index as the default instead.
 
 If the EFI partition is already mounted, use its existing mount point instead of mounting it again at `/mnt/efi`.
-After an upgrade, each installed version normally has a regular and a failsafe entry, so do not assume the other
-version's regular entry is always index `1`; inspect the generated config as above.
+Do not assume the other version's regular entry is always index `1`; inspect the entries in your generated config.
 
 ### Choosing a configuration migration method
 
