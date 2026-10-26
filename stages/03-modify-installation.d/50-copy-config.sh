@@ -57,11 +57,7 @@ rsync)
     # target release's package-manager configuration, world file, and banners.
     echo "Synchronizing /etc with rsync..."
     if rsync -a \
-        --exclude=/apk/*** \
-        --exclude=/opkg/*** \
-        --exclude=/opkg.conf \
-        --exclude=/banner \
-        --exclude=/banner.failsafe \
+        --exclude-from="$SCRIPTS/rsync-excludes.txt" \
         /etc/ "$MOUNTED_ROOT/etc/"; then
         :
     else
