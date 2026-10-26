@@ -179,6 +179,15 @@ $package
     done
 }
 
+# Function: __abpp_packages_remove_duplicates
+# Keeps the first occurrence of each package in a list.
+#
+# Parameters:
+#   &0 -- The packages to filter.
+__abpp_packages_remove_duplicates() {
+    awk '!seen[$0]++'
+}
+
 # Function: __abpp_packages_filter_installed_list
 # Removes packages that are not present in the active installed-package list.
 #

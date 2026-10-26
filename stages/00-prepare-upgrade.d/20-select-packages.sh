@@ -14,7 +14,7 @@
 
 echo "Collecting list of installed packages..."
 packages="$("$SCRIPTS"/libexec/packages-info user-minimal)"
-packages="$(printf '%s\n' "$packages" | abpp_packages_filter_excluded)"
+packages="$(printf '%s\n' "$packages" | abpp_packages_filter_excluded | __abpp_packages_remove_duplicates)"
 echo "The following packages were found:"
 
 # Print the packages.
