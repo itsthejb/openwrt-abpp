@@ -4,4 +4,3 @@
 /opkg/***
 /opkg.conf
 /banner
-/banner.failsafe
