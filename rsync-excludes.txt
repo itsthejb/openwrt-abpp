@@ -1,3 +1,4 @@
+# These files will _not_ be synced from old -> new.
 # Patterns are relative to the /etc/ transfer root.
 /apk/***
 /opkg/***
