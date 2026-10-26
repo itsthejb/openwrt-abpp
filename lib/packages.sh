@@ -179,6 +179,15 @@ $package
     done
 }
 
+# Function: __abpp_packages_sort_unique
+# Sorts a package list and removes duplicates.
+#
+# Parameters:
+#   &0 -- The packages to filter.
+__abpp_packages_sort_unique() {
+    sort -u
+}
+
 # Function: __abpp_packages_filter_installed_list
 # Removes packages that are not present in the active installed-package list.
 #
