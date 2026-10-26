@@ -1,0 +1,6 @@
+# Patterns are relative to the /etc/ transfer root.
+/apk/***
+/opkg/***
+/opkg.conf
+/banner
+/banner.failsafe
