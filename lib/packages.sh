@@ -179,13 +179,13 @@ $package
     done
 }
 
-# Function: __abpp_packages_remove_duplicates
-# Keeps the first occurrence of each package in a list.
+# Function: __abpp_packages_sort_unique
+# Sorts a package list and removes duplicates.
 #
 # Parameters:
 #   &0 -- The packages to filter.
-__abpp_packages_remove_duplicates() {
-    awk '!seen[$0]++'
+__abpp_packages_sort_unique() {
+    sort -u
 }
 
 # Function: __abpp_packages_filter_installed_list
